@@ -1,6 +1,6 @@
 {
 	"schemaVersion": 1,
-	"id": "xeenaa_village_picker",
+	"id": "xeenaa_villager_manager",
 	"version": "${version}",
 	"name": "Xeenaa Villager Manager",
 	"description": "A Fabric mod that provides comprehensive villager management tools including profession assignment, trading management, and villager utilities through an intuitive GUI.",
@@ -12,20 +12,20 @@
 		"sources": "https://github.com/xeenaa/villager-manager"
 	},
 	"license": "CC0-1.0",
-	"icon": "assets/xeenaa_village_picker/icon.png",
+	"icon": "assets/xeenaa_villager_manager/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"com.xeenaa.villagepicker.XeenaaVillagePicker"
+			"com.xeenaa.villagermanager.XeenaaVillagerManager"
 		],
 		"client": [
-			"com.xeenaa.villagepicker.XeenaaVillagePickerClient"
+			"com.xeenaa.villagermanager.XeenaaVillagerManagerClient"
 		]
 	},
 	"mixins": [
-		"xeenaa_village_picker.mixins.json",
+		"xeenaa_villager_manager.mixins.json",
 		{
-			"config": "xeenaa_village_picker.client.mixins.json",
+			"config": "xeenaa_villager_manager.client.mixins.json",
 			"environment": "client"
 		}
 	],

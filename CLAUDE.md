@@ -40,9 +40,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Package Structure
 ```
-com.xeenaa.villagepicker/
-├── XeenaaVillagePicker.java           # Main mod entry point
-├── XeenaaVillagePickerClient.java     # Client-side initializer  
+com.xeenaa.villagermanager/
+├── XeenaaVillagerManager.java           # Main mod entry point
+├── XeenaaVillagerManagerClient.java     # Client-side initializer  
 ├── client/
 │   ├── gui/                           # GUI screens and widgets
 │   └── util/ClientInteractionHandler  # Client-side interaction logic
@@ -64,8 +64,8 @@ com.xeenaa.villagepicker/
 
 **Resource Files**:
 - `fabric.mod.json` - Mod metadata and entry points
-- `xeenaa_village_picker.mixins.json` - Mixin configurations  
-- `xeenaa_village_picker.client.mixins.json` - Client-side mixin configs
+- `xeenaa_villager_manager.mixins.json` - Mixin configurations
+- `xeenaa_villager_manager.client.mixins.json` - Client-side mixin configs
 
 ## Working Methodology
 
@@ -74,15 +74,14 @@ This project uses specialized agents to manage different aspects of development:
 ### Agent Responsibilities
 
 - **project-scope-manager**: Manages `.claude/project.md` (project description) and `.claude/tasks.md` (task tracking)
-- **java-standards-engineer**: Manages `standards.md` (coding standards) and `changelog.md` (decisions and failed solutions)
-- **minecraft-fabric-expert**: Provides Minecraft 1.21.1 and Fabric modding expertise
+- **minecraft-java-engineer**: Handles all Java development, standards enforcement, Minecraft 1.21.1 expertise, and Fabric modding. Manages `standards.md` (coding standards) and `changelog.md` (decisions and failed solutions)
 - **minecraft-qa-specialist**: Analyzes testing issues and debugging problems
 
 ### Workflow Process
 
 **Before any work:**
 1. Read `.claude/changelog.md` to avoid repeating past issues
-2. Check `.claude/tasks.md` to identify the next task and review previous task status  
+2. Check `.claude/tasks.md` to identify the next task and review previous task status
 3. Review `standards.md` for current code conventions
 4. Consult `.claude/project.md` for project specifications and context
 
@@ -93,7 +92,7 @@ This project uses specialized agents to manage different aspects of development:
 
 **After completing work:**
 1. Use **project-scope-manager** to update tasks and project scope
-2. Use **java-standards-engineer** to update changelog and standards
+2. Use **minecraft-java-engineer** to update changelog and standards
 3. Update CLAUDE.md only if agent responsibilities change
 
 This methodology persists across all sessions - always maintain and reference these files when working on the project.

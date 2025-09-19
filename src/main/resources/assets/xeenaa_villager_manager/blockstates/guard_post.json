@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "xeenaa_villager_manager:block/guard_post" },
+    "facing=south": { "model": "xeenaa_villager_manager:block/guard_post", "y": 180 },
+    "facing=east": { "model": "xeenaa_villager_manager:block/guard_post", "y": 90 },
+    "facing=west": { "model": "xeenaa_villager_manager:block/guard_post", "y": 270 }
+  }
+}

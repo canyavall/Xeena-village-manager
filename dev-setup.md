@@ -33,8 +33,8 @@
 3. Changes should be reflected in running client (limited hot reload)
 
 ## Project Structure
-- `src/main/java/com/xeenaa/villagepicker/` - Main mod code
-- `src/client/java/com/xeenaa/villagepicker/` - Client-side code
+- `src/main/java/com/xeenaa/villagermanager/` - Main mod code
+- `src/client/java/com/xeenaa/villagermanager/` - Client-side code
 - `src/main/resources/` - Mod resources and configs
 - `src/client/resources/` - Client-side resources
 

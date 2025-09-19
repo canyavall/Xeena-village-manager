@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "xeenaa_villager_manager:block/guard_post"
+  }
+}

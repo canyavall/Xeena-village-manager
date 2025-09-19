@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(dir:*)",
-      "Bash(./gradlew:*)"
+      "Bash(./gradlew:*)",
+      "Bash(find:*)",
+      "Bash(mv:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

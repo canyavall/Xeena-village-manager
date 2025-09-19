@@ -39,8 +39,8 @@ This document serves as the **definitive source** for all Java coding standards,
 
 ```
 src/
-├── main/java/com/xeenaa/villagepicker/
-│   ├── XeenaaVillagePicker.java       # Main mod initializer (server/common)
+├── main/java/com/xeenaa/villagermanager/
+│   ├── XeenaaVillagerManager.java       # Main mod initializer (server/common)
 │   ├── network/                       # Client-server communication
 │   │   ├── SelectProfessionPacket.java    # C2S profession change request
 │   │   └── ServerPacketHandler.java       # Server-side packet processing
@@ -52,8 +52,8 @@ src/
 │   │   └── ValidationUtils.java           # Input validation utilities
 │   └── mixin/                         # Mixins (use sparingly)
 │       └── common/                    # Common/server mixins only
-├── client/java/com/xeenaa/villagepicker/
-│   ├── XeenaaVillagePickerClient.java # Client mod initializer
+├── client/java/com/xeenaa/villagermanager/
+│   ├── XeenaaVillagerManagerClient.java # Client mod initializer
 │   ├── client/
 │   │   ├── gui/                       # Client-side GUI components
 │   │   │   ├── ProfessionSelectionScreen.java  # Main GUI screen
@@ -64,9 +64,9 @@ src/
 │       └── client/                    # Client-only mixins
 └── resources/
     ├── fabric.mod.json                # Mod metadata
-    ├── xeenaa_village_picker.mixins.json      # Common mixin config
-    ├── xeenaa_village_picker.client.mixins.json  # Client mixin config
-    └── assets/xeenaa_village_picker/
+    ├── xeenaa_villager_manager.mixins.json      # Common mixin config
+    ├── xeenaa_villager_manager.client.mixins.json  # Client mixin config
+    └── assets/xeenaa_villager_manager/
         ├── lang/en_us.json           # Localization
         └── icon.png                  # Mod icon
 ```
@@ -90,7 +90,7 @@ src/
 
 | Element | Convention | Example | Requirements |
 |---------|------------|---------|-------------|
-| **Packages** | lowercase, dot-separated | `com.xeenaa.villagepicker.network` | No abbreviations, clear hierarchy |
+| **Packages** | lowercase, dot-separated | `com.xeenaa.villagermanager.network` | No abbreviations, clear hierarchy |
 | **Classes** | PascalCase, descriptive nouns | `ProfessionSelectionScreen` | Avoid abbreviations, be specific |
 | **Interfaces** | PascalCase, capability-focused | `ProfessionProvider`, `Configurable` | Use -able, -er, or descriptive nouns |
 | **Records** | PascalCase, data-focused | `ProfessionData`, `NetworkMessage` | Represent immutable data structures |
@@ -252,7 +252,7 @@ public record SelectProfessionPacket(
 ) implements CustomPayload {
     
     public static final CustomPayload.Id<SelectProfessionPacket> ID = 
-        new CustomPayload.Id<>(Identifier.of(XeenaaVillagePicker.MOD_ID, "select_profession"));
+        new CustomPayload.Id<>(Identifier.of(XeenaaVillagerManager.MOD_ID, "select_profession"));
     
     // REQUIRED: PacketCodec for Minecraft 1.21.1 serialization
     public static final PacketCodec<RegistryByteBuf, SelectProfessionPacket> CODEC = 
@@ -363,7 +363,7 @@ public class ProfessionSelectionScreen extends Screen {
     
     // REQUIRED: Non-null assertion in constructor
     public ProfessionSelectionScreen(VillagerEntity villager) {
-        super(Text.translatable("gui.xeenaa_village_picker.select_profession"));
+        super(Text.translatable("gui.xeenaa_villager_manager.select_profession"));
         this.targetVillager = Objects.requireNonNull(villager, "Villager cannot be null");
         this.professions = ProfessionManager.getInstance().getAllProfessions();
     }
@@ -1206,7 +1206,7 @@ Before submitting any code, verify compliance with these standards:
 ---
 
 **Last Updated**: 2025-09-16 - Comprehensive Java standards for Fabric 1.21.1
-**Maintainer**: java-standards-engineer  
+**Maintainer**: minecraft-java-engineer  
 **Version**: 2.0.0 - Major enhancement with comprehensive Java patterns
 
-*These standards are mandatory and must be followed by all contributors. Any deviations must be approved by the java-standards-engineer and documented as architectural decisions.*
+*These standards are mandatory and must be followed by all contributors. Any deviations must be approved by the minecraft-java-engineer and documented as architectural decisions.*

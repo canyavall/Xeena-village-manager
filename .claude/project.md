@@ -1,16 +1,35 @@
-# Xeenaa Village Picker
+# Xeenaa Villager Manager
 
 ## Project Overview
 
-**Xeenaa Village Picker** is a Minecraft Fabric mod for version 1.21.1 that provides an intuitive GUI for managing villager professions.
+**Xeenaa Villager Manager** is a comprehensive Minecraft Fabric mod for version 1.21.1 that provides advanced villager management tools through an intuitive GUI interface. The mod offers a complete suite of features designed to give players full control over villager behavior, trades, and properties.
 
-### Core Features
-- **Right-click Interaction**: Players can right-click on any villager to open the profession selection GUI
+### Completed Features (Epic 1: Profession Management)
+- **Right-click Interaction**: Players can shift+right-click on any villager to open the management GUI
 - **Complete Profession List**: Displays all available professions including vanilla and modded professions
 - **Profession Assignment**: Allows players to assign any available profession to the selected villager
 - **Persistence**: Assigned professions persist through game sessions and work as intended by the game mechanics
 - **Mod Compatibility**: Automatically detects and includes professions from other installed mods
 - **Performance Optimized**: Built with efficiency in mind to minimize performance impact
+
+### Planned Features (Future Epics)
+The mod is designed as a comprehensive villager management platform with multiple feature sets planned for future development:
+
+**Epic 2: Guard Profession System** (Next Major Feature - In Development)
+- **Custom Guard Profession**: New profession with comprehensive equipment management capabilities
+- **Tabbed GUI System**: Enhanced interface with tabs for profession and equipment management
+- **AI Behavior Modes**: Three distinct behaviors - Patrol, Guard (stationary), and Follow
+- **Combat System**: Equipment-based combat statistics and performance optimization
+- **JSON Configuration**: Fully configurable system with external JSON config files
+
+This epic builds directly upon the existing profession management system, extending the GUI framework and registry architecture to support custom professions with advanced capabilities.
+
+**Future Epics**:
+- **Trade Management System**: View, modify, and manage villager trades and trading levels
+- **Villager Utilities**: Additional tools for villager optimization and management
+- **Advanced Properties**: Control over villager attributes and behaviors
+- **Batch Operations**: Tools for managing multiple villagers simultaneously
+- **Integration Features**: Enhanced compatibility with other villager-focused mods
 
 ### Technical Requirements
 - **Minecraft Version**: 1.21.1
@@ -22,9 +41,9 @@
 
 ### Package Structure
 ```
-com.xeenaa.villagepicker/
-├── XeenaaVillagePicker.java           # Main mod entry point
-├── XeenaaVillagePickerClient.java     # Client-side initializer  
+com.xeenaa.villagermanager/
+├── XeenaaVillagerManager.java           # Main mod entry point
+├── XeenaaVillagerManagerClient.java     # Client-side initializer  
 ├── client/
 │   ├── gui/                           # GUI screens and widgets
 │   └── util/ClientInteractionHandler  # Client-side interaction logic
@@ -46,8 +65,8 @@ com.xeenaa.villagepicker/
 
 **Resource Files**:
 - `fabric.mod.json` - Mod metadata and entry points
-- `xeenaa_village_picker.mixins.json` - Mixin configurations  
-- `xeenaa_village_picker.client.mixins.json` - Client-side mixin configs
+- `xeenaa_villager_manager.mixins.json` - Mixin configurations
+- `xeenaa_villager_manager.client.mixins.json` - Client-side mixin configs
 
 ## Common Development Commands
 
@@ -97,12 +116,20 @@ This methodology persists across all sessions - always maintain and reference th
 
 ## Current Development Status
 
-The project is currently in Phase 6 of development (Networking & Profession Persistence), with Phases 1-5 completed:
+**Status**: Feature Expansion Phase
 
-- ✅ **Phase 1-3**: Project setup, core foundation, and entity interaction system
-- ✅ **Phase 4**: Profession registry system with automatic mod detection
-- ✅ **Phase 5**: Complete GUI implementation with 3-column grid layout
-- ⚠️ **Phase 6**: Networking system implemented, persistence solution in testing
-- 🔄 **Phases 7-11**: Pending - profession assignment, edge cases, polish, and release
+### Epic 1: Profession Management System ✅ COMPLETED
+**Completion Date**: 2025-09-18
 
-The mod currently provides a fully functional GUI for profession selection with comprehensive profession detection, but profession persistence after assignment is being refined.
+The profession management system is fully implemented and functional:
+- Complete shift+right-click interaction system
+- Comprehensive profession detection (vanilla + modded)
+- Full GUI implementation with 3-column grid layout
+- Client-server networking with packet validation
+- Persistent profession assignment with proper game mechanics integration
+- Performance optimized caching and registry management
+
+### Next Development Phase
+The mod is now positioned for expansion into a comprehensive villager management suite. The next epic will focus on implementing additional villager management features, building upon the solid foundation established by the profession management system.
+
+**Architecture Status**: The core architecture (client-server communication, GUI framework, registry system, and event handling) is stable and ready to support additional feature development.
