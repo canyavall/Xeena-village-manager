@@ -74,8 +74,11 @@ This project uses specialized agents to manage different aspects of development:
 ### Agent Responsibilities
 
 - **project-scope-manager**: Manages `.claude/project.md` (project description) and `.claude/tasks.md` (task tracking)
-- **minecraft-java-engineer**: Handles all Java development, standards enforcement, Minecraft 1.21.1 expertise, and Fabric modding. Manages `standards.md` (coding standards) and `changelog.md` (decisions and failed solutions)
-- **minecraft-qa-specialist**: Analyzes testing issues and debugging problems
+- **minecraft-architect**: Makes high-level technical decisions, designs systems, and resolves architectural challenges. NEVER writes code - only provides patterns and solutions
+- **minecraft-developer**: Implements features following architecture guidance and standards. Focuses on clean, maintainable code. Manages `standards.md` (coding standards) and `changelog.md` (decisions and failed solutions)
+- **minecraft-qa-specialist**: Specializes in testing, debugging, and log analysis. Finds and diagnoses issues in implemented code
+- **minecraft-ui-ux-designer**: Analyzes, improves, and designs Minecraft mod UI/UX elements. Reviews GUI implementations and proposes enhancements. UI concepts and designs are stored in `.claude/ui/`
+- **minecraft-researcher**: Resolves "unknown unknowns" - investigates how Minecraft systems work, analyzes other mods, and finds solutions to novel problems. Stores findings in `.claude/research/`
 
 ### Workflow Process
 
@@ -88,11 +91,15 @@ This project uses specialized agents to manage different aspects of development:
 **During work:**
 1. Follow all code standards defined in `standards.md`
 2. Reference the current task from `.claude/tasks.md`
-3. Use specialized agents for their respective domains
+3. Use specialized agents for their respective domains:
+   - Use **minecraft-architect** when designing new features or resolving architectural challenges
+   - Use **minecraft-researcher** when facing unknown problems or investigating how systems work
+   - Use **minecraft-ui-ux-designer** after implementing GUI code or when planning new UI features
 
 **After completing work:**
 1. Use **project-scope-manager** to update tasks and project scope
-2. Use **minecraft-java-engineer** to update changelog and standards
-3. Update CLAUDE.md only if agent responsibilities change
+2. Use **minecraft-developer** to update changelog and standards
+3. For GUI-related changes, use **minecraft-ui-ux-designer** to review and suggest improvements
+4. Update CLAUDE.md only if agent responsibilities change
 
 This methodology persists across all sessions - always maintain and reference these files when working on the project.

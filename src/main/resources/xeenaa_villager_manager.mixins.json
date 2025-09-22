@@ -3,6 +3,8 @@
 	"package": "com.xeenaa.villagermanager.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"mixins": [
+		"VillagerEntityMixin",
+		"VillagerAIMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

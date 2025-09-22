@@ -1,6 +1,10 @@
 package com.xeenaa.villagermanager.client.gui;
 
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
+import com.xeenaa.villagermanager.client.network.GuardDataSyncHandler;
+import com.xeenaa.villagermanager.data.GuardData;
+import com.xeenaa.villagermanager.network.EquipGuardPacket;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.item.ItemStack;
@@ -311,16 +315,113 @@ public class EquipmentTab extends Tab {
     }
 
     /**
-     * Loads the current equipment state from the villager or storage.
+     * Loads the current equipment state from the server data cache.
      */
     private void loadEquipmentState() {
-        // For now, set some example equipment for demonstration
-        // In a full implementation, this would load from NBT data
-        equipmentSlots.get(EquipmentSlot.SlotType.WEAPON).setItem(new ItemStack(Items.IRON_SWORD));
-        equipmentSlots.get(EquipmentSlot.SlotType.HELMET).setItem(new ItemStack(Items.CHAINMAIL_HELMET));
-        equipmentSlots.get(EquipmentSlot.SlotType.CHESTPLATE).setItem(new ItemStack(Items.LEATHER_CHESTPLATE));
-        equipmentSlots.get(EquipmentSlot.SlotType.SHIELD).setItem(new ItemStack(Items.SHIELD));
-        // Leggings and boots remain empty for demonstration
+        // Get cached guard data from server sync
+        com.xeenaa.villagermanager.client.data.ClientGuardDataCache cache =
+            com.xeenaa.villagermanager.client.data.ClientGuardDataCache.getInstance();
+        GuardData cachedData = cache.getGuardData(targetVillager.getUuid());
+
+        if (cachedData != null) {
+            // Load equipment from cached data
+            for (Map.Entry<GuardData.EquipmentSlot, ItemStack> entry : cachedData.getAllEquipment().entrySet()) {
+                EquipmentSlot.SlotType slotType = convertToGuiSlotType(entry.getKey());
+                if (slotType != null) {
+                    equipmentSlots.get(slotType).setItem(entry.getValue());
+                }
+            }
+
+            // Update role selection
+            updateRoleFromServerData(cachedData.getRole());
+
+            XeenaaVillagerManager.LOGGER.debug("Loaded equipment state from server cache for villager {}",
+                targetVillager.getUuid());
+        } else {
+            // No cached data, request from server
+            requestEquipmentDataFromServer();
+
+            // Set empty equipment as placeholder
+            for (EquipmentSlot.SlotType slotType : EquipmentSlot.SlotType.values()) {
+                equipmentSlots.get(slotType).setItem(ItemStack.EMPTY);
+            }
+
+            XeenaaVillagerManager.LOGGER.debug("No cached equipment data, requesting from server for villager {}",
+                targetVillager.getUuid());
+        }
+    }
+
+    /**
+     * Converts GuardData.EquipmentSlot to GUI EquipmentSlot.SlotType
+     */
+    private EquipmentSlot.SlotType convertToGuiSlotType(GuardData.EquipmentSlot dataSlot) {
+        switch (dataSlot) {
+            case WEAPON: return EquipmentSlot.SlotType.WEAPON;
+            case HELMET: return EquipmentSlot.SlotType.HELMET;
+            case CHESTPLATE: return EquipmentSlot.SlotType.CHESTPLATE;
+            case LEGGINGS: return EquipmentSlot.SlotType.LEGGINGS;
+            case BOOTS: return EquipmentSlot.SlotType.BOOTS;
+            case SHIELD: return EquipmentSlot.SlotType.SHIELD;
+            default: return null;
+        }
+    }
+
+    /**
+     * Converts GUI EquipmentSlot.SlotType to GuardData.EquipmentSlot
+     */
+    private GuardData.EquipmentSlot convertToDataSlotType(EquipmentSlot.SlotType guiSlot) {
+        switch (guiSlot) {
+            case WEAPON: return GuardData.EquipmentSlot.WEAPON;
+            case HELMET: return GuardData.EquipmentSlot.HELMET;
+            case CHESTPLATE: return GuardData.EquipmentSlot.CHESTPLATE;
+            case LEGGINGS: return GuardData.EquipmentSlot.LEGGINGS;
+            case BOOTS: return GuardData.EquipmentSlot.BOOTS;
+            case SHIELD: return GuardData.EquipmentSlot.SHIELD;
+            default: return null;
+        }
+    }
+
+    /**
+     * Updates role selection from server data
+     */
+    private void updateRoleFromServerData(GuardData.GuardRole serverRole) {
+        RoleButton.GuardRole guiRole = convertToGuiRole(serverRole);
+        if (guiRole != null) {
+            updateRoleSelection(guiRole);
+        }
+    }
+
+    /**
+     * Converts GuardData.GuardRole to GUI RoleButton.GuardRole
+     */
+    private RoleButton.GuardRole convertToGuiRole(GuardData.GuardRole dataRole) {
+        switch (dataRole) {
+            case PATROL: return RoleButton.GuardRole.PATROL;
+            case GUARD: return RoleButton.GuardRole.GUARD;
+            case FOLLOW: return RoleButton.GuardRole.FOLLOW;
+            default: return RoleButton.GuardRole.GUARD;
+        }
+    }
+
+    /**
+     * Converts GUI RoleButton.GuardRole to GuardData.GuardRole
+     */
+    private GuardData.GuardRole convertToDataRole(RoleButton.GuardRole guiRole) {
+        switch (guiRole) {
+            case PATROL: return GuardData.GuardRole.PATROL;
+            case GUARD: return GuardData.GuardRole.GUARD;
+            case FOLLOW: return GuardData.GuardRole.FOLLOW;
+            default: return GuardData.GuardRole.GUARD;
+        }
+    }
+
+    /**
+     * Requests equipment data from server (placeholder for future implementation)
+     */
+    private void requestEquipmentDataFromServer() {
+        // TODO: Implement equipment data request packet
+        // For now, this could be part of the initial profession selection packet
+        XeenaaVillagerManager.LOGGER.debug("Equipment data request from server not yet implemented");
     }
 
     /**
@@ -329,21 +430,44 @@ public class EquipmentTab extends Tab {
     private void handleEquipmentSlotClick(EquipmentSlot slot) {
         XeenaaVillagerManager.LOGGER.debug("Equipment slot clicked: {}", slot.getSlotType());
 
-        // TODO: Implement equipment change logic
-        // This would typically:
-        // 1. Check player inventory for valid items
-        // 2. Show item selection GUI or handle drag-and-drop
-        // 3. Send equipment change packet to server
-        // 4. Update local display
+        // Convert GUI slot type to data slot type
+        GuardData.EquipmentSlot dataSlot = convertToDataSlotType(slot.getSlotType());
+        if (dataSlot == null) {
+            XeenaaVillagerManager.LOGGER.warn("Failed to convert slot type: {}", slot.getSlotType());
+            return;
+        }
 
         // For now, cycle through example items for demonstration
-        cycleExampleItem(slot);
+        // In a full implementation, this would open an inventory GUI or handle drag-and-drop
+        ItemStack newEquipment = getNextExampleItem(slot);
+
+        // Send equipment change to server
+        sendEquipmentChangeToServer(dataSlot, newEquipment);
+
+        // Update local display immediately for responsiveness (will be overridden by server response)
+        slot.setItem(newEquipment);
+
+        XeenaaVillagerManager.LOGGER.debug("Sent equipment change to server: {} -> {}",
+            dataSlot, newEquipment);
     }
 
     /**
-     * Cycles through example items for demonstration purposes.
+     * Sends equipment change packet to server
      */
-    private void cycleExampleItem(EquipmentSlot slot) {
+    private void sendEquipmentChangeToServer(GuardData.EquipmentSlot slot, ItemStack equipment) {
+        EquipGuardPacket packet = new EquipGuardPacket(
+            targetVillager.getUuid(),
+            slot,
+            equipment
+        );
+
+        ClientPlayNetworking.send(packet);
+    }
+
+    /**
+     * Gets the next example item for demonstration purposes.
+     */
+    private ItemStack getNextExampleItem(EquipmentSlot slot) {
         ItemStack currentItem = slot.getItem();
         ItemStack newItem = ItemStack.EMPTY;
 
@@ -355,6 +479,8 @@ public class EquipmentTab extends Tab {
                     newItem = new ItemStack(Items.IRON_SWORD);
                 } else if (currentItem.isOf(Items.IRON_SWORD)) {
                     newItem = new ItemStack(Items.DIAMOND_SWORD);
+                } else {
+                    newItem = ItemStack.EMPTY; // Cycle back to empty
                 }
                 break;
             case HELMET:
@@ -364,12 +490,53 @@ public class EquipmentTab extends Tab {
                     newItem = new ItemStack(Items.IRON_HELMET);
                 } else if (currentItem.isOf(Items.IRON_HELMET)) {
                     newItem = new ItemStack(Items.DIAMOND_HELMET);
+                } else {
+                    newItem = ItemStack.EMPTY; // Cycle back to empty
                 }
                 break;
-            // Add similar logic for other slots as needed
+            case CHESTPLATE:
+                if (currentItem.isEmpty()) {
+                    newItem = new ItemStack(Items.LEATHER_CHESTPLATE);
+                } else if (currentItem.isOf(Items.LEATHER_CHESTPLATE)) {
+                    newItem = new ItemStack(Items.IRON_CHESTPLATE);
+                } else if (currentItem.isOf(Items.IRON_CHESTPLATE)) {
+                    newItem = new ItemStack(Items.DIAMOND_CHESTPLATE);
+                } else {
+                    newItem = ItemStack.EMPTY;
+                }
+                break;
+            case LEGGINGS:
+                if (currentItem.isEmpty()) {
+                    newItem = new ItemStack(Items.LEATHER_LEGGINGS);
+                } else if (currentItem.isOf(Items.LEATHER_LEGGINGS)) {
+                    newItem = new ItemStack(Items.IRON_LEGGINGS);
+                } else if (currentItem.isOf(Items.IRON_LEGGINGS)) {
+                    newItem = new ItemStack(Items.DIAMOND_LEGGINGS);
+                } else {
+                    newItem = ItemStack.EMPTY;
+                }
+                break;
+            case BOOTS:
+                if (currentItem.isEmpty()) {
+                    newItem = new ItemStack(Items.LEATHER_BOOTS);
+                } else if (currentItem.isOf(Items.LEATHER_BOOTS)) {
+                    newItem = new ItemStack(Items.IRON_BOOTS);
+                } else if (currentItem.isOf(Items.IRON_BOOTS)) {
+                    newItem = new ItemStack(Items.DIAMOND_BOOTS);
+                } else {
+                    newItem = ItemStack.EMPTY;
+                }
+                break;
+            case SHIELD:
+                if (currentItem.isEmpty()) {
+                    newItem = new ItemStack(Items.SHIELD);
+                } else {
+                    newItem = ItemStack.EMPTY; // Only one shield type
+                }
+                break;
         }
 
-        slot.setItem(newItem);
+        return newItem;
     }
 
     /**
@@ -381,9 +548,21 @@ public class EquipmentTab extends Tab {
 
             XeenaaVillagerManager.LOGGER.debug("Role changed to: {}", role);
 
-            // TODO: Send role change packet to server
-            // TODO: Update villager AI behavior
+            // Send role change to server
+            // We'll use the same EquipGuardPacket for role changes by sending it with a special null equipment
+            // In the future, this could be a dedicated RoleChangePacket
+            sendRoleChangeToServer(role);
         }
+    }
+
+    /**
+     * Sends role change to server (placeholder - would be better with dedicated packet)
+     */
+    private void sendRoleChangeToServer(RoleButton.GuardRole role) {
+        // TODO: Implement dedicated role change packet
+        // For now, log the action
+        XeenaaVillagerManager.LOGGER.debug("Role change to {} would be sent to server for villager {}",
+            role, targetVillager.getUuid());
     }
 
     /**
