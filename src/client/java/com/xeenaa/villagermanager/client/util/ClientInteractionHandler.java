@@ -1,7 +1,11 @@
 package com.xeenaa.villagermanager.client.util;
 
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
+import com.xeenaa.villagermanager.client.data.ClientGuardDataCache;
+import com.xeenaa.villagermanager.client.gui.GuardRankScreen;
 import com.xeenaa.villagermanager.client.gui.VillagerManagementScreen;
+import com.xeenaa.villagermanager.data.GuardData;
+import com.xeenaa.villagermanager.profession.ModProfessions;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -49,12 +53,28 @@ public class ClientInteractionHandler {
             return ActionResult.PASS;
         }
 
-        // Open villager management GUI
+        // Check if villager is a guard and open appropriate screen
         MinecraftClient client = MinecraftClient.getInstance();
-        VillagerManagementScreen screen = new VillagerManagementScreen(villager);
-        client.setScreen(screen);
 
-        XeenaaVillagerManager.LOGGER.info("Opened VillagerManagementScreen for villager (shift + right-click)");
+        if (isGuard(villager)) {
+            // Open guard rank screen for guards
+            GuardData guardData = ClientGuardDataCache.getInstance().getGuardData(villager);
+            if (guardData != null) {
+                GuardRankScreen screen = new GuardRankScreen(villager, guardData.getRankData());
+                client.setScreen(screen);
+                XeenaaVillagerManager.LOGGER.info("Opened GuardRankScreen for guard villager (shift + right-click)");
+            } else {
+                // Fallback to management screen if no guard data yet
+                VillagerManagementScreen screen = new VillagerManagementScreen(villager);
+                client.setScreen(screen);
+                XeenaaVillagerManager.LOGGER.info("Opened VillagerManagementScreen for guard villager without data (shift + right-click)");
+            }
+        } else {
+            // Open normal villager management GUI for non-guards
+            VillagerManagementScreen screen = new VillagerManagementScreen(villager);
+            client.setScreen(screen);
+            XeenaaVillagerManager.LOGGER.info("Opened VillagerManagementScreen for villager (shift + right-click)");
+        }
 
         // Consume the interaction to prevent vanilla trading GUI
         return ActionResult.SUCCESS;
@@ -80,5 +100,12 @@ public class ClientInteractionHandler {
 
         // TODO: Add more checks (e.g., zombie villager, special villager types)
         return true;
+    }
+
+    /**
+     * Check if villager is a guard
+     */
+    public static boolean isGuard(VillagerEntity villager) {
+        return villager.getVillagerData().getProfession() == ModProfessions.GUARD;
     }
 }

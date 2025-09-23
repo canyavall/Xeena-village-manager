@@ -35,13 +35,7 @@ public class VillagerManagementScreen extends TabbedManagementScreen {
                 targetVillager.getId());
         }
 
-        // Add equipment tab if villager is a Guard
-        EquipmentTab equipmentTab = new EquipmentTab(targetVillager);
-        if (equipmentTab.isAvailable()) {
-            addTab(equipmentTab);
-            XeenaaVillagerManager.LOGGER.debug("Added equipment tab for Guard villager {}",
-                targetVillager.getId());
-        }
+        // Equipment tab removed - will be replaced with rank tab in ranking system
 
         // TODO: Add future tabs here
         // - Trade management tab

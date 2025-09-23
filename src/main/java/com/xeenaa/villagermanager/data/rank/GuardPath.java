@@ -1,5 +1,6 @@
 package com.xeenaa.villagermanager.data.rank;
 
+import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.util.StringIdentifiable;
@@ -12,8 +13,18 @@ public enum GuardPath implements StringIdentifiable {
     MELEE("melee", "Man-at-Arms", "Melee combat specialization path"),
     RANGED("ranged", "Marksman", "Ranged combat specialization path");
 
-    public static final PacketCodec<PacketCodecs.PacketBuf, GuardPath> CODEC =
-        PacketCodecs.fromEnum(GuardPath.class);
+    public static final PacketCodec<RegistryByteBuf, GuardPath> CODEC =
+        new PacketCodec<RegistryByteBuf, GuardPath>() {
+            @Override
+            public GuardPath decode(RegistryByteBuf buf) {
+                return buf.readEnumConstant(GuardPath.class);
+            }
+
+            @Override
+            public void encode(RegistryByteBuf buf, GuardPath path) {
+                buf.writeEnumConstant(path);
+            }
+        };
 
     private final String id;
     private final String displayName;
@@ -47,6 +58,14 @@ public enum GuardPath implements StringIdentifiable {
             if (path.id.equals(id)) {
                 return path;
             }
+        }
+        return RECRUIT;
+    }
+
+    public static GuardPath fromOrdinal(int ordinal) {
+        GuardPath[] values = values();
+        if (ordinal >= 0 && ordinal < values.length) {
+            return values[ordinal];
         }
         return RECRUIT;
     }

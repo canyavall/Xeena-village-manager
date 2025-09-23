@@ -32,10 +32,9 @@ public class GuardVillagerRenderer extends LivingEntityRenderer<VillagerEntity, 
     public GuardVillagerRenderer(EntityRendererFactory.Context ctx, SimplifiedVillagerModel model) {
         super(ctx, model, 0.5F);
 
-        // Add equipment feature layer for proper equipment rendering
-        this.addFeature(new GuardEquipmentFeature(this, ctx.getItemRenderer()));
+        // Equipment feature removed - ranking system will handle visual elements
 
-        LOGGER.info("GuardVillagerRenderer initialized with simplified model and equipment feature layer");
+        LOGGER.info("GuardVillagerRenderer initialized with simplified model");
     }
 
     @Override

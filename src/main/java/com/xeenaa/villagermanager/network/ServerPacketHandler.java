@@ -1,9 +1,17 @@
 package com.xeenaa.villagermanager.network;
 
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
+import com.xeenaa.villagermanager.data.GuardData;
+import com.xeenaa.villagermanager.data.GuardDataManager;
+import com.xeenaa.villagermanager.data.rank.GuardRank;
+import com.xeenaa.villagermanager.data.rank.GuardRankData;
+import com.xeenaa.villagermanager.profession.ModProfessions;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.attribute.EntityAttributeInstance;
+import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -21,6 +29,7 @@ public class ServerPacketHandler {
         XeenaaVillagerManager.LOGGER.info("Registering server-side packet handlers");
 
         ServerPlayNetworking.registerGlobalReceiver(SelectProfessionPacket.PACKET_ID, ServerPacketHandler::handleSelectProfession);
+        ServerPlayNetworking.registerGlobalReceiver(PurchaseRankPacket.PACKET_ID, ServerPacketHandler::handlePurchaseRank);
     }
 
     /**
@@ -119,6 +128,136 @@ public class ServerPacketHandler {
 
         // Reinitialize brain for normal AI behavior
         villager.reinitializeBrain((ServerWorld) villager.getWorld());
+    }
+
+    /**
+     * Handle rank purchase packet from client
+     */
+    private static void handlePurchaseRank(PurchaseRankPacket packet, ServerPlayNetworking.Context context) {
+        ServerPlayerEntity player = context.player();
+        // Ensure we're running on the server thread
+        player.getServer().execute(() -> {
+            try {
+                XeenaaVillagerManager.LOGGER.info("Processing rank purchase from player: {} for villager: {} to rank: {}",
+                    player.getName().getString(), packet.villagerId(), packet.targetRank().getDisplayName());
+
+                // Find the villager entity
+                ServerWorld world = (ServerWorld) player.getWorld();
+                Entity entity = null;
+
+                // Search for villager by UUID in all loaded entities
+                for (Entity e : world.iterateEntities()) {
+                    if (e instanceof VillagerEntity && e.getUuid().equals(packet.villagerId())) {
+                        entity = e;
+                        break;
+                    }
+                }
+
+                if (!(entity instanceof VillagerEntity villager)) {
+                    XeenaaVillagerManager.LOGGER.warn("Villager {} not found or not loaded", packet.villagerId());
+                    return;
+                }
+
+                // Validate this is a guard villager
+                if (villager.getVillagerData().getProfession() != ModProfessions.GUARD) {
+                    XeenaaVillagerManager.LOGGER.warn("Villager {} is not a guard", packet.villagerId());
+                    return;
+                }
+
+                // Validate the player can interact with this villager
+                if (!canPlayerChangeProfession(player, villager)) {
+                    XeenaaVillagerManager.LOGGER.warn("Player {} cannot purchase rank for villager {}",
+                        player.getName().getString(), packet.villagerId());
+                    return;
+                }
+
+                // Get or create guard data
+                GuardDataManager guardManager = GuardDataManager.get(world);
+                GuardData guardData = guardManager.getGuardData(packet.villagerId());
+                if (guardData == null) {
+                    guardData = new GuardData(packet.villagerId());
+                    guardManager.updateGuardData(villager, guardData);
+                }
+
+                GuardRankData rankData = guardData.getRankData();
+                GuardRank targetRank = packet.targetRank();
+
+                // Validate purchase requirements
+                if (!rankData.canPurchaseRank(targetRank)) {
+                    XeenaaVillagerManager.LOGGER.warn("Cannot purchase rank {} for villager {} - requirements not met",
+                        targetRank.getDisplayName(), packet.villagerId());
+                    return;
+                }
+
+                // Check player has enough emeralds
+                int playerEmeralds = player.getInventory().count(Items.EMERALD);
+                int cost = targetRank.getEmeraldCost();
+
+                if (playerEmeralds < cost) {
+                    XeenaaVillagerManager.LOGGER.warn("Player {} has insufficient emeralds ({} < {}) for rank {}",
+                        player.getName().getString(), playerEmeralds, cost, targetRank.getDisplayName());
+                    return;
+                }
+
+                // Deduct emeralds from player inventory
+                for (int i = 0; i < cost; i++) {
+                    player.getInventory().removeStack(player.getInventory().getSlotWithStack(Items.EMERALD.getDefaultStack()), 1);
+                }
+
+                // Purchase the rank
+                if (rankData.purchaseRank(targetRank, playerEmeralds)) {
+                    // Apply rank stats to villager
+                    applyRankStats(villager, targetRank);
+
+                    // Save guard data
+                    guardData.saveToVillager(villager, world.getRegistryManager());
+
+                    // Send sync packet to all clients
+                    GuardRankSyncPacket syncPacket = new GuardRankSyncPacket(
+                        packet.villagerId(),
+                        targetRank,
+                        rankData.getTotalEmeraldsSpent()
+                    );
+
+                    // Send to all players in the area
+                    world.getPlayers().forEach(p -> {
+                        if (p.squaredDistanceTo(villager) < 1024) { // 32 block radius
+                            ServerPlayNetworking.send(p, syncPacket);
+                        }
+                    });
+
+                    XeenaaVillagerManager.LOGGER.info("Successfully purchased rank {} for villager {} (cost: {} emeralds)",
+                        targetRank.getDisplayName(), packet.villagerId(), cost);
+                } else {
+                    XeenaaVillagerManager.LOGGER.error("Rank purchase failed for unknown reason - villager {}",
+                        packet.villagerId());
+                }
+
+            } catch (Exception e) {
+                XeenaaVillagerManager.LOGGER.error("Error processing rank purchase packet", e);
+            }
+        });
+    }
+
+    /**
+     * Apply rank-based stats to a guard villager
+     */
+    private static void applyRankStats(VillagerEntity villager, GuardRank rank) {
+        // Apply health
+        EntityAttributeInstance healthAttribute = villager.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH);
+        if (healthAttribute != null) {
+            healthAttribute.setBaseValue(rank.getHealth());
+            villager.setHealth(rank.getHealth()); // Heal to new max health
+        }
+
+        // Apply attack damage
+        EntityAttributeInstance attackAttribute = villager.getAttributeInstance(EntityAttributes.GENERIC_ATTACK_DAMAGE);
+        if (attackAttribute != null) {
+            attackAttribute.setBaseValue(rank.getAttackDamage());
+        }
+
+        XeenaaVillagerManager.LOGGER.debug("Applied rank {} stats to villager {}: HP={}, Attack={}",
+            rank.getDisplayName(), villager.getUuid(), rank.getHealth(), rank.getAttackDamage());
     }
 
 }

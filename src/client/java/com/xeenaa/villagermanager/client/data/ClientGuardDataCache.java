@@ -140,8 +140,8 @@ public class ClientGuardDataCache {
             LOGGER.debug("Added new guard data for villager: {}", villagerId);
         }
 
-        LOGGER.trace("Guard data updated: villager={}, role={}, hasEquipment={}",
-            villagerId, guardData.getRole(), guardData.hasEquipment());
+        LOGGER.trace("Guard data updated: villager={}, role={}",
+            villagerId, guardData.getRole());
     }
 
     /**

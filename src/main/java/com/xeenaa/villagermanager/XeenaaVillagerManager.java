@@ -3,9 +3,10 @@ package com.xeenaa.villagermanager;
 import com.xeenaa.villagermanager.block.ModBlocks;
 import com.xeenaa.villagermanager.config.ModConfig;
 import com.xeenaa.villagermanager.network.SelectProfessionPacket;
-import com.xeenaa.villagermanager.network.EquipGuardPacket;
 import com.xeenaa.villagermanager.network.GuardDataSyncPacket;
 import com.xeenaa.villagermanager.network.InitialGuardDataSyncPacket;
+import com.xeenaa.villagermanager.network.GuardRankSyncPacket;
+import com.xeenaa.villagermanager.network.PurchaseRankPacket;
 import com.xeenaa.villagermanager.network.PlayerJoinHandler;
 import com.xeenaa.villagermanager.network.ServerPacketHandler;
 import com.xeenaa.villagermanager.profession.ModProfessions;
@@ -63,13 +64,13 @@ public class XeenaaVillagerManager implements ModInitializer {
 
         // Register network packets
         PayloadTypeRegistry.playC2S().register(SelectProfessionPacket.PACKET_ID, SelectProfessionPacket.CODEC);
-        PayloadTypeRegistry.playC2S().register(EquipGuardPacket.ID, EquipGuardPacket.CODEC);
+        PayloadTypeRegistry.playC2S().register(PurchaseRankPacket.PACKET_ID, PurchaseRankPacket.CODEC);
         PayloadTypeRegistry.playS2C().register(GuardDataSyncPacket.ID, GuardDataSyncPacket.CODEC);
         PayloadTypeRegistry.playS2C().register(InitialGuardDataSyncPacket.PACKET_ID, InitialGuardDataSyncPacket.CODEC);
+        PayloadTypeRegistry.playS2C().register(GuardRankSyncPacket.PACKET_ID, GuardRankSyncPacket.CODEC);
 
         // Register server-side packet handlers
         ServerPacketHandler.registerHandlers();
-        EquipGuardPacket.register();
 
         // Register player join handler for initial guard data sync
         PlayerJoinHandler.register();

@@ -23,7 +23,8 @@
       "Bash(del srcmainresourcesxeenaa_villager_manager.client.mixins.json)",
       "Bash(del \"C:\\Users\\canya\\Documents\\projects\\Minecraft\\xeena-village-manager\\.claude\\agents\\minecraft-java-engineer.md\")",
       "Bash(java:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

@@ -28,9 +28,9 @@ public class GuardAttackGoal extends ActiveTargetGoal<HostileEntity> {
             return false;
         }
 
-        // Check if guard has a weapon equipped
+        // Check if guard data exists (guards always can fight with basic combat)
         GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
-        if (guardData == null || !hasWeapon(guardData)) {
+        if (guardData == null) {
             return false;
         }
 
@@ -54,32 +54,19 @@ public class GuardAttackGoal extends ActiveTargetGoal<HostileEntity> {
     @Override
     public void start() {
         super.start();
-
-        // Equip weapon in hand for visual feedback
-        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
-        if (guardData != null) {
-            ItemStack weapon = guardData.getEquipment(GuardData.EquipmentSlot.WEAPON);
-            if (!weapon.isEmpty()) {
-                guard.setStackInHand(Hand.MAIN_HAND, weapon.copy());
-            }
-        }
+        // Guard AI starts - rank-based equipment will be handled by rendering system
     }
 
     @Override
     public void stop() {
         super.stop();
-        // Clear weapon from hand when not in combat
-        guard.setStackInHand(Hand.MAIN_HAND, ItemStack.EMPTY);
+        // Guard AI stops - rank-based equipment will be handled by rendering system
     }
 
     private boolean isGuard() {
         return guard.getVillagerData().getProfession().id().equals("guard");
     }
 
-    private boolean hasWeapon(GuardData guardData) {
-        ItemStack weapon = guardData.getEquipment(GuardData.EquipmentSlot.WEAPON);
-        return !weapon.isEmpty();
-    }
 
     private boolean isNearPost() {
         // Check if guard is within 16 blocks of their assigned post

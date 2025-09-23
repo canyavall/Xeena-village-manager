@@ -114,31 +114,5 @@ public abstract class VillagerAIMixin extends MerchantEntity {
     }
 
 
-    @Unique
-    private float calculateArmorProtection(GuardData guardData) {
-        float protection = 0.0f;
-
-        // Each armor piece provides damage reduction
-        if (!guardData.getEquipment(GuardData.EquipmentSlot.HELMET).isEmpty()) {
-            protection += 0.08f; // 8% reduction
-        }
-        if (!guardData.getEquipment(GuardData.EquipmentSlot.CHESTPLATE).isEmpty()) {
-            protection += 0.16f; // 16% reduction
-        }
-        if (!guardData.getEquipment(GuardData.EquipmentSlot.LEGGINGS).isEmpty()) {
-            protection += 0.12f; // 12% reduction
-        }
-        if (!guardData.getEquipment(GuardData.EquipmentSlot.BOOTS).isEmpty()) {
-            protection += 0.04f; // 4% reduction
-        }
-
-        // Shield provides additional protection
-        if (!guardData.getEquipment(GuardData.EquipmentSlot.SHIELD).isEmpty() && this.getRandom().nextFloat() < 0.33f) {
-            protection += 0.25f; // 33% chance to block 25% damage with shield
-        }
-
-        // Cap at 60% damage reduction
-        return Math.min(protection, 0.6f);
-    }
 
 }

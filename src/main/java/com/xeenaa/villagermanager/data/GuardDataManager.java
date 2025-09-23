@@ -138,29 +138,17 @@ public class GuardDataManager extends PersistentState {
     }
 
     /**
-     * Clears equipment for a guard when changing professions
+     * Handles guard data cleanup when changing professions
      */
-    public void clearEquipmentForProfessionChange(VillagerEntity villager) {
+    public void handleProfessionChange(VillagerEntity villager) {
         UUID villagerId = villager.getUuid();
         GuardData data = guardDataMap.get(villagerId);
 
-        if (data != null && data.hasEquipment()) {
-            // Drop equipment items before clearing
-            dropEquipmentItems(villager, data);
-            data.clearAllEquipment();
+        if (data != null) {
+            // Keep guard data but reset to default role if needed
+            data.setRole(GuardData.GuardRole.GUARD);
             markDirty();
-            XeenaaVillagerManager.LOGGER.info("Cleared equipment for villager {} due to profession change", villagerId);
-        }
-    }
-
-    /**
-     * Drops equipment items when clearing
-     */
-    private void dropEquipmentItems(VillagerEntity villager, GuardData data) {
-        for (var entry : data.getAllEquipment().entrySet()) {
-            if (!entry.getValue().isEmpty()) {
-                villager.dropStack(entry.getValue());
-            }
+            XeenaaVillagerManager.LOGGER.info("Reset guard role for villager {} due to profession change", villagerId);
         }
     }
 

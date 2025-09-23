@@ -1,7 +1,6 @@
 package com.xeenaa.villagermanager.network;
 
 import com.xeenaa.villagermanager.data.GuardData;
-import net.minecraft.item.ItemStack;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
@@ -39,20 +38,12 @@ public record InitialGuardDataSyncPacket(Map<UUID, GuardData> guardDataMap) impl
                         UUID villagerId = Uuids.PACKET_CODEC.decode(buf);
                         GuardData.GuardRole role = buf.readEnumConstant(GuardData.GuardRole.class);
 
-                        // Read equipment map
-                        int equipmentCount = buf.readVarInt();
                         GuardData guardData = new GuardData(villagerId);
                         guardData.setRole(role);
 
-                        for (int j = 0; j < equipmentCount; j++) {
-                            GuardData.EquipmentSlot slot = buf.readEnumConstant(GuardData.EquipmentSlot.class);
-                            ItemStack itemStack = ItemStack.PACKET_CODEC.decode(buf);
-                            guardData.setEquipment(slot, itemStack);
-                        }
-
                         guardDataMap.put(villagerId, guardData);
-                        LOGGER.info("Decoded guard data for villager {}: role={}, has equipment = {}",
-                                   villagerId, role, guardData.hasEquipment());
+                        LOGGER.info("Decoded guard data for villager {}: role={}",
+                                   villagerId, role);
                     } catch (Exception e) {
                         LOGGER.error("Failed to decode guard data entry {}: {}", i, e.getMessage(), e);
                     }
@@ -75,22 +66,8 @@ public record InitialGuardDataSyncPacket(Map<UUID, GuardData> guardDataMap) impl
                         GuardData guardData = entry.getValue();
                         buf.writeEnumConstant(guardData.getRole());
 
-                        // Write equipment map - only non-empty items
-                        Map<GuardData.EquipmentSlot, ItemStack> nonEmptyEquipment = new HashMap<>();
-                        for (Map.Entry<GuardData.EquipmentSlot, ItemStack> equipEntry : guardData.getAllEquipment().entrySet()) {
-                            if (!equipEntry.getValue().isEmpty()) {
-                                nonEmptyEquipment.put(equipEntry.getKey(), equipEntry.getValue());
-                            }
-                        }
-
-                        buf.writeVarInt(nonEmptyEquipment.size());
-                        for (Map.Entry<GuardData.EquipmentSlot, ItemStack> equipEntry : nonEmptyEquipment.entrySet()) {
-                            buf.writeEnumConstant(equipEntry.getKey());
-                            ItemStack.PACKET_CODEC.encode(buf, equipEntry.getValue());
-                        }
-
-                        LOGGER.info("Encoded guard data for villager {}: role={}, equipment items = {}",
-                                   entry.getKey(), guardData.getRole(), nonEmptyEquipment.size());
+                        LOGGER.info("Encoded guard data for villager {}: role={}",
+                                   entry.getKey(), guardData.getRole());
                     } catch (Exception e) {
                         LOGGER.error("Failed to encode guard data for villager {}: {}",
                                    entry.getKey(), e.getMessage(), e);

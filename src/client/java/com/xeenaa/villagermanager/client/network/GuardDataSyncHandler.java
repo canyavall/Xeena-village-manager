@@ -3,7 +3,9 @@ package com.xeenaa.villagermanager.client.network;
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
 import com.xeenaa.villagermanager.client.data.ClientGuardDataCache;
 import com.xeenaa.villagermanager.data.GuardData;
+import com.xeenaa.villagermanager.data.rank.GuardRankData;
 import com.xeenaa.villagermanager.network.GuardDataSyncPacket;
+import com.xeenaa.villagermanager.network.GuardRankSyncPacket;
 import com.xeenaa.villagermanager.network.InitialGuardDataSyncPacket;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
@@ -54,6 +56,9 @@ public class GuardDataSyncHandler {
 
             ClientPlayNetworking.registerGlobalReceiver(InitialGuardDataSyncPacket.PACKET_ID, GuardDataSyncHandler::handleInitialSync);
             LOGGER.info("Successfully registered client-side InitialGuardDataSyncPacket handler");
+
+            ClientPlayNetworking.registerGlobalReceiver(GuardRankSyncPacket.PACKET_ID, GuardDataSyncHandler::handleRankSync);
+            LOGGER.info("Successfully registered client-side GuardRankSyncPacket handler");
         } catch (Exception e) {
             LOGGER.error("Failed to register guard data sync handlers", e);
             throw new RuntimeException("Guard data sync handler registration failed", e);
@@ -137,8 +142,8 @@ public class GuardDataSyncHandler {
             // Add all guard data from the packet
             for (var entry : packet.guardDataMap().entrySet()) {
                 cache.updateGuardData(entry.getKey(), entry.getValue());
-                LOGGER.info("Loaded guard data for villager {}: has equipment = {}",
-                           entry.getKey(), entry.getValue().hasEquipment());
+                LOGGER.info("Loaded guard data for villager {}: role = {}",
+                           entry.getKey(), entry.getValue().getRole());
             }
 
             LOGGER.info("Client guard data cache initialized with {} entries", packet.guardDataMap().size());
@@ -174,13 +179,10 @@ public class GuardDataSyncHandler {
             ClientGuardDataCache cache = ClientGuardDataCache.getInstance();
             cache.updateGuardData(packet.villagerId(), guardData);
 
-            LOGGER.debug("Updated client guard data for villager {}: role={}, hasEquipment={}",
-                packet.villagerId(), guardData.getRole(), guardData.hasEquipment());
+            LOGGER.debug("Updated client guard data for villager {}: role={}",
+                packet.villagerId(), guardData.getRole());
 
-            // Log equipment summary for debugging
-            if (LOGGER.isTraceEnabled() && guardData.hasEquipment()) {
-                logEquipmentSummary(packet.villagerId(), guardData);
-            }
+            // Guard data updated successfully
 
         } catch (Exception e) {
             LOGGER.error("Failed to process guard data sync for villager: {}", packet.villagerId(), e);
@@ -209,35 +211,11 @@ public class GuardDataSyncHandler {
         // Set role from packet
         guardData.setRole(packet.role());
 
-        // Set equipment from packet
-        packet.equipment().forEach(guardData::setEquipment);
+        // Equipment system removed - role only sync
 
         return guardData;
     }
 
-    /**
-     * Logs equipment summary for debugging purposes.
-     * <p>
-     * This method provides detailed logging of equipment data for
-     * troubleshooting synchronization issues.
-     * </p>
-     *
-     * @param villagerId the villager UUID
-     * @param guardData the guard data containing equipment
-     * @since 1.0.0
-     */
-    private static void logEquipmentSummary(java.util.UUID villagerId, GuardData guardData) {
-        StringBuilder summary = new StringBuilder();
-        summary.append("Equipment sync for villager ").append(villagerId).append(": ");
-
-        guardData.getAllEquipment().forEach((slot, item) -> {
-            if (!item.isEmpty()) {
-                summary.append(slot).append("=").append(item.getItem().getName().getString()).append(" ");
-            }
-        });
-
-        LOGGER.trace(summary.toString());
-    }
 
     /**
      * Gets synchronization statistics for monitoring and debugging.
@@ -320,5 +298,63 @@ public class GuardDataSyncHandler {
         }
 
         return isValid;
+    }
+
+    /**
+     * Handles incoming guard rank synchronization packets from the server.
+     */
+    private static void handleRankSync(GuardRankSyncPacket packet, ClientPlayNetworking.Context context) {
+        Objects.requireNonNull(packet, "Guard rank sync packet must not be null");
+        Objects.requireNonNull(context, "Client networking context must not be null");
+
+        packetsReceived++;
+        MinecraftClient client = context.client();
+
+        // Execute on client main thread for thread safety
+        client.execute(() -> {
+            try {
+                processRankSync(packet, client);
+                packetsProcessed++;
+                LOGGER.info("Successfully processed rank sync packet for villager: {} (rank: {})",
+                    packet.villagerId(), packet.currentRank().getDisplayName());
+            } catch (Exception e) {
+                processingErrors++;
+                LOGGER.error("Error processing rank sync packet for villager {}: {}",
+                    packet.villagerId(), e.getMessage(), e);
+            }
+        });
+    }
+
+    /**
+     * Processes the rank synchronization packet and updates the client cache.
+     */
+    private static void processRankSync(GuardRankSyncPacket packet, MinecraftClient client) {
+        Objects.requireNonNull(packet, "Guard rank sync packet must not be null");
+        Objects.requireNonNull(client, "Minecraft client must not be null");
+
+        try {
+            ClientGuardDataCache cache = ClientGuardDataCache.getInstance();
+
+            // Get or create guard data in client cache
+            GuardData guardData = cache.getGuardData(packet.villagerId());
+            if (guardData == null) {
+                guardData = new GuardData(packet.villagerId());
+                cache.updateGuardData(packet.villagerId(), guardData);
+            }
+
+            // Update rank data
+            GuardRankData rankData = guardData.getRankData();
+            rankData.setCurrentRank(packet.currentRank());
+
+            // Update the cache
+            cache.updateGuardData(packet.villagerId(), guardData);
+
+            LOGGER.debug("Updated client rank data for villager {}: rank={}, emeralds_spent={}",
+                packet.villagerId(), packet.currentRank().getDisplayName(), packet.totalEmeraldsSpent());
+
+        } catch (Exception e) {
+            LOGGER.error("Failed to process rank sync for villager: {}", packet.villagerId(), e);
+            throw e;
+        }
     }
 }
