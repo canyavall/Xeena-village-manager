@@ -15,12 +15,12 @@ import net.minecraft.entity.passive.VillagerEntity;
 @Environment(EnvType.CLIENT)
 public class SimplifiedVillagerModel extends EntityModel<VillagerEntity> {
     public final ModelPart root;
-    private final ModelPart head;
-    private final ModelPart body;
-    private final ModelPart rightArm;
-    private final ModelPart leftArm;
-    private final ModelPart rightLeg;
-    private final ModelPart leftLeg;
+    public final ModelPart head;
+    public final ModelPart body;
+    public final ModelPart rightArm;
+    public final ModelPart leftArm;
+    public final ModelPart rightLeg;
+    public final ModelPart leftLeg;
 
     public SimplifiedVillagerModel(ModelPart root) {
         this.root = root;
