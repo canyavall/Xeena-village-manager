@@ -251,12 +251,17 @@ public class ProfessionTab extends Tab {
         // Check if Guard profession was selected for workflow transition
         Identifier guardProfessionId = Registries.VILLAGER_PROFESSION.getId(ModProfessions.GUARD);
         if (professionData.getId().equals(guardProfessionId)) {
-            XeenaaVillagerManager.LOGGER.info("Guard profession selected - initiating workflow transition to rank management");
+            XeenaaVillagerManager.LOGGER.info("Guard profession selected - refreshing tabs and switching to rank management");
 
-            // Close profession screen and schedule rank screen opening
-            if (parentScreen != null) {
-                parentScreen.close();
-                scheduleGuardRankScreenOpening();
+            // Stay in the VillagerManagementScreen and refresh tabs to show RankTab
+            if (parentScreen instanceof TabbedManagementScreen tabbedScreen) {
+                // Schedule refresh after server sync delay
+                scheduleTabRefreshAndSwitch(tabbedScreen);
+            } else {
+                // Fallback: close screen normally
+                if (parentScreen != null) {
+                    parentScreen.close();
+                }
             }
         } else {
             // For non-guard professions, just close the screen normally
@@ -267,12 +272,12 @@ public class ProfessionTab extends Tab {
     }
 
     /**
-     * Schedules the opening of the GuardRankScreen after a brief delay to allow server processing
+     * Schedules tab refresh and switch to RankTab after a brief delay to allow server processing
      */
-    private void scheduleGuardRankScreenOpening() {
+    private void scheduleTabRefreshAndSwitch(TabbedManagementScreen tabbedScreen) {
         MinecraftClient client = MinecraftClient.getInstance();
 
-        // Schedule the rank screen opening after server has time to process and sync guard data
+        // Schedule the tab refresh after server has time to process and sync guard data
         client.execute(() -> {
             // Wait a few ticks for server processing
             new Thread(() -> {
@@ -280,36 +285,42 @@ public class ProfessionTab extends Tab {
                     Thread.sleep(500); // 500ms delay for server processing
 
                     client.execute(() -> {
-                        openGuardRankScreen();
+                        refreshTabsAndSwitchToRank(tabbedScreen);
                     });
                 } catch (InterruptedException e) {
-                    XeenaaVillagerManager.LOGGER.warn("Guard rank screen opening interrupted", e);
+                    XeenaaVillagerManager.LOGGER.warn("Tab refresh and switch interrupted", e);
                 }
             }).start();
         });
     }
 
     /**
-     * Opens the GuardRankScreen for the newly created guard
+     * Refreshes tabs and switches to RankTab for the newly created guard
      */
-    private void openGuardRankScreen() {
+    private void refreshTabsAndSwitchToRank(TabbedManagementScreen tabbedScreen) {
         try {
-            MinecraftClient client = MinecraftClient.getInstance();
             ClientGuardDataCache cache = ClientGuardDataCache.getInstance();
 
-            // Try to get guard data from cache
+            // Check if guard data is available
             GuardData guardData = cache.getGuardData(targetVillager);
 
             if (guardData != null) {
-                GuardRankScreen rankScreen = new GuardRankScreen(targetVillager, guardData.getRankData());
-                client.setScreen(rankScreen);
-                XeenaaVillagerManager.LOGGER.info("Successfully opened GuardRankScreen for new guard via workflow transition");
+                // Refresh tabs to include the new RankTab
+                tabbedScreen.refreshTabs();
+
+                // Switch to RankTab
+                boolean switched = tabbedScreen.switchToTabByType(RankTab.class);
+                if (switched) {
+                    XeenaaVillagerManager.LOGGER.info("Successfully switched to RankTab for new guard via integrated workflow");
+                } else {
+                    XeenaaVillagerManager.LOGGER.warn("RankTab not available after refresh - may need to retry");
+                }
             } else {
                 XeenaaVillagerManager.LOGGER.warn("Guard data not yet available for workflow transition - guard data sync may be delayed");
                 // Could retry here or show a temporary message
             }
         } catch (Exception e) {
-            XeenaaVillagerManager.LOGGER.error("Failed to open GuardRankScreen in workflow transition", e);
+            XeenaaVillagerManager.LOGGER.error("Failed to refresh tabs and switch to RankTab in workflow transition", e);
         }
     }
 

@@ -68,12 +68,12 @@ public class GuardRankScreen extends Screen {
 
         // Path selection buttons (only show for recruit rank)
         if (rankData.getCurrentRank() == GuardRank.RECRUIT) {
-            meleePathButton = ButtonWidget.builder(Text.literal("Melee Path"), button -> purchaseRank(GuardRank.GUARD_MELEE))
+            meleePathButton = ButtonWidget.builder(Text.literal("Melee Path"), button -> purchaseRank(GuardRank.MAN_AT_ARMS_I))
                     .dimensions(backgroundX + 20, backgroundY + 120, 100, 20)
                     .build();
             addDrawableChild(meleePathButton);
 
-            rangedPathButton = ButtonWidget.builder(Text.literal("Ranged Path"), button -> purchaseRank(GuardRank.GUARD_RANGED))
+            rangedPathButton = ButtonWidget.builder(Text.literal("Ranged Path"), button -> purchaseRank(GuardRank.MARKSMAN_I))
                     .dimensions(backgroundX + 136, backgroundY + 120, 100, 20)
                     .build();
             addDrawableChild(rangedPathButton);
@@ -97,11 +97,11 @@ public class GuardRankScreen extends Screen {
         int playerEmeralds = getPlayerEmeraldCount();
 
         if (meleePathButton != null) {
-            meleePathButton.active = playerEmeralds >= GuardRank.GUARD_MELEE.getEmeraldCost();
+            meleePathButton.active = playerEmeralds >= GuardRank.MAN_AT_ARMS_I.getEmeraldCost();
         }
 
         if (rangedPathButton != null) {
-            rangedPathButton.active = playerEmeralds >= GuardRank.GUARD_RANGED.getEmeraldCost();
+            rangedPathButton.active = playerEmeralds >= GuardRank.MARKSMAN_I.getEmeraldCost();
         }
 
         if (upgradeButton != null) {

@@ -300,6 +300,61 @@ public class TabbedManagementScreen extends Screen {
     }
 
     /**
+     * Refreshes all tabs, re-evaluating availability and reinitializing the tab list.
+     */
+    public void refreshTabs() {
+        Tab previousActiveTab = activeTab;
+        String previousActiveTabName = previousActiveTab != null ?
+            previousActiveTab.getClass().getSimpleName() : null;
+
+        // Clear existing tabs
+        if (activeTab != null) {
+            activeTab.onDeactivate();
+        }
+        tabs.clear();
+        tabButtons.clear();
+        activeTab = null;
+
+        // Reinitialize tabs
+        initializeTabs();
+        calculateLayout();
+
+        // Try to restore previous active tab or switch to a specific tab
+        Tab tabToActivate = null;
+        if (previousActiveTabName != null) {
+            tabToActivate = tabs.stream()
+                .filter(tab -> tab.getClass().getSimpleName().equals(previousActiveTabName))
+                .findFirst()
+                .orElse(null);
+        }
+
+        // If previous tab not found or not available, activate first tab
+        if (tabToActivate == null && !tabs.isEmpty()) {
+            tabToActivate = tabs.get(0);
+        }
+
+        if (tabToActivate != null) {
+            switchToTab(tabToActivate);
+        }
+    }
+
+    /**
+     * Switches to a tab by its class type.
+     */
+    public boolean switchToTabByType(Class<? extends Tab> tabClass) {
+        Tab targetTab = tabs.stream()
+            .filter(tab -> tabClass.isInstance(tab))
+            .findFirst()
+            .orElse(null);
+
+        if (targetTab != null) {
+            switchToTab(targetTab);
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Gets the content area bounds for tab content rendering.
      *
      * @return array containing [x, y, width, height] of content area

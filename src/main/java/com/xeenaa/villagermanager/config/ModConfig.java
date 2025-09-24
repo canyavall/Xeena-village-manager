@@ -36,18 +36,7 @@ public class ModConfig {
         public int guard_range = 16;
         public int patrol_radius = 48;
         public double experience_gain_rate = 1.0;
-        public List<String> allowed_equipment = new ArrayList<>();
-
-        public GuardSettings() {
-            // Default allowed equipment
-            allowed_equipment.add("minecraft:iron_sword");
-            allowed_equipment.add("minecraft:diamond_sword");
-            allowed_equipment.add("minecraft:shield");
-            allowed_equipment.add("minecraft:iron_helmet");
-            allowed_equipment.add("minecraft:iron_chestplate");
-            allowed_equipment.add("minecraft:iron_leggings");
-            allowed_equipment.add("minecraft:iron_boots");
-        }
+        // Equipment system removed - replaced with ranking system
     }
 
     // Default configuration
@@ -172,10 +161,5 @@ public class ModConfig {
         return guard_settings != null && guard_settings.enabled;
     }
 
-    /**
-     * Check if an item is allowed as guard equipment
-     */
-    public boolean isAllowedGuardEquipment(String itemId) {
-        return guard_settings != null && guard_settings.allowed_equipment.contains(itemId);
-    }
+    // Equipment check method removed - replaced with ranking system
 }

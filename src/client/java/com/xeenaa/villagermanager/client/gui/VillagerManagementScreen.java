@@ -35,7 +35,13 @@ public class VillagerManagementScreen extends TabbedManagementScreen {
                 targetVillager.getId());
         }
 
-        // Equipment tab removed - will be replaced with rank tab in ranking system
+        // Add rank tab for guard villagers
+        RankTab rankTab = new RankTab(targetVillager);
+        if (rankTab.isAvailable()) {
+            addTab(rankTab);
+            XeenaaVillagerManager.LOGGER.debug("Added rank tab for guard villager {}",
+                targetVillager.getId());
+        }
 
         // TODO: Add future tabs here
         // - Trade management tab

@@ -56,23 +56,13 @@ public class ClientInteractionHandler {
         // Check if villager is a guard and open appropriate screen
         MinecraftClient client = MinecraftClient.getInstance();
 
+        // Always open VillagerManagementScreen with integrated tabs for all villagers
+        VillagerManagementScreen screen = new VillagerManagementScreen(villager);
+        client.setScreen(screen);
+
         if (isGuard(villager)) {
-            // Open guard rank screen for guards
-            GuardData guardData = ClientGuardDataCache.getInstance().getGuardData(villager);
-            if (guardData != null) {
-                GuardRankScreen screen = new GuardRankScreen(villager, guardData.getRankData());
-                client.setScreen(screen);
-                XeenaaVillagerManager.LOGGER.info("Opened GuardRankScreen for guard villager (shift + right-click)");
-            } else {
-                // Fallback to management screen if no guard data yet
-                VillagerManagementScreen screen = new VillagerManagementScreen(villager);
-                client.setScreen(screen);
-                XeenaaVillagerManager.LOGGER.info("Opened VillagerManagementScreen for guard villager without data (shift + right-click)");
-            }
+            XeenaaVillagerManager.LOGGER.info("Opened VillagerManagementScreen for guard villager with integrated tabs (shift + right-click)");
         } else {
-            // Open normal villager management GUI for non-guards
-            VillagerManagementScreen screen = new VillagerManagementScreen(villager);
-            client.setScreen(screen);
             XeenaaVillagerManager.LOGGER.info("Opened VillagerManagementScreen for villager (shift + right-click)");
         }
 

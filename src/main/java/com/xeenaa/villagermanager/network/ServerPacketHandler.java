@@ -5,6 +5,7 @@ import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.data.GuardDataManager;
 import com.xeenaa.villagermanager.data.rank.GuardRank;
 import com.xeenaa.villagermanager.data.rank.GuardRankData;
+import com.xeenaa.villagermanager.data.rank.RankStats;
 import com.xeenaa.villagermanager.profession.ModProfessions;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.Entity;
@@ -277,21 +278,23 @@ public class ServerPacketHandler {
      * Apply rank-based stats to a guard villager
      */
     private static void applyRankStats(VillagerEntity villager, GuardRank rank) {
+        RankStats stats = rank.getStats();
+
         // Apply health
         EntityAttributeInstance healthAttribute = villager.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH);
         if (healthAttribute != null) {
-            healthAttribute.setBaseValue(rank.getHealth());
-            villager.setHealth(rank.getHealth()); // Heal to new max health
+            healthAttribute.setBaseValue(stats.getMaxHealth());
+            villager.setHealth(stats.getMaxHealth()); // Heal to new max health
         }
 
         // Apply attack damage
         EntityAttributeInstance attackAttribute = villager.getAttributeInstance(EntityAttributes.GENERIC_ATTACK_DAMAGE);
         if (attackAttribute != null) {
-            attackAttribute.setBaseValue(rank.getAttackDamage());
+            attackAttribute.setBaseValue(stats.getAttackDamage());
         }
 
         XeenaaVillagerManager.LOGGER.debug("Applied rank {} stats to villager {}: HP={}, Attack={}",
-            rank.getDisplayName(), villager.getUuid(), rank.getHealth(), rank.getAttackDamage());
+            rank.getDisplayName(), villager.getUuid(), stats.getMaxHealth(), stats.getAttackDamage());
     }
 
 }

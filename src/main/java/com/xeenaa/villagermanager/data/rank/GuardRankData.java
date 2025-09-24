@@ -55,6 +55,13 @@ public class GuardRankData {
     }
 
     /**
+     * Adds to the total emeralds spent counter
+     */
+    public void addEmeraldsSpent(int amount) {
+        this.totalEmeraldsSpent += amount;
+    }
+
+    /**
      * Attempts to purchase the specified rank.
      *
      * @param targetRank the rank to purchase

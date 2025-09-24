@@ -69,4 +69,24 @@ public enum GuardPath implements StringIdentifiable {
         }
         return RECRUIT;
     }
+
+    /**
+     * Checks if this path can be selected from the current path
+     * @param currentPath The guard's current path
+     * @return true if the transition is valid
+     */
+    public boolean canTransitionFrom(GuardPath currentPath) {
+        // Can only specialize from RECRUIT to MELEE or RANGED
+        if (this == RECRUIT) {
+            return false; // Cannot go back to recruit
+        }
+
+        // Can specialize from RECRUIT to any path
+        if (currentPath == RECRUIT) {
+            return this != RECRUIT;
+        }
+
+        // Cannot switch between specializations
+        return this == currentPath;
+    }
 }
