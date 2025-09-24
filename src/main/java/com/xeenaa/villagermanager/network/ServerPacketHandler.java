@@ -128,6 +128,40 @@ public class ServerPacketHandler {
 
         // Reinitialize brain for normal AI behavior
         villager.reinitializeBrain((ServerWorld) villager.getWorld());
+
+        // If the villager is now a guard, create guard data and sync to clients
+        if (profession == ModProfessions.GUARD) {
+            createAndSyncGuardData(villager);
+        }
+    }
+
+    /**
+     * Creates guard data for a new guard villager and syncs it to nearby clients
+     */
+    private static void createAndSyncGuardData(VillagerEntity villager) {
+        ServerWorld world = (ServerWorld) villager.getWorld();
+        GuardDataManager guardManager = GuardDataManager.get(world);
+
+        // Create new guard data
+        GuardData guardData = new GuardData(villager.getUuid());
+        guardManager.updateGuardData(villager, guardData);
+
+        // Save to villager NBT
+        guardData.saveToVillager(villager, world.getRegistryManager());
+
+        // Send sync packet to nearby clients
+        GuardDataSyncPacket syncPacket = new GuardDataSyncPacket(
+            villager.getUuid(),
+            guardData.getRole()
+        );
+
+        world.getPlayers().forEach(player -> {
+            if (player.squaredDistanceTo(villager) < 1024) { // 32 block radius
+                ServerPlayNetworking.send(player, syncPacket);
+            }
+        });
+
+        XeenaaVillagerManager.LOGGER.info("Created and synced guard data for villager {}", villager.getUuid());
     }
 
     /**

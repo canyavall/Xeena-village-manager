@@ -1,15 +1,21 @@
 package com.xeenaa.villagermanager.client.gui;
 
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
+import com.xeenaa.villagermanager.client.data.ClientGuardDataCache;
 import com.xeenaa.villagermanager.config.ModConfig;
+import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.network.SelectProfessionPacket;
+import com.xeenaa.villagermanager.profession.ModProfessions;
 import com.xeenaa.villagermanager.registry.ProfessionData;
 import com.xeenaa.villagermanager.registry.ProfessionManager;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -242,9 +248,68 @@ public class ProfessionTab extends Tab {
         );
         ClientPlayNetworking.send(packet);
 
-        // Close the entire management screen after selection
-        if (parentScreen != null) {
-            parentScreen.close();
+        // Check if Guard profession was selected for workflow transition
+        Identifier guardProfessionId = Registries.VILLAGER_PROFESSION.getId(ModProfessions.GUARD);
+        if (professionData.getId().equals(guardProfessionId)) {
+            XeenaaVillagerManager.LOGGER.info("Guard profession selected - initiating workflow transition to rank management");
+
+            // Close profession screen and schedule rank screen opening
+            if (parentScreen != null) {
+                parentScreen.close();
+                scheduleGuardRankScreenOpening();
+            }
+        } else {
+            // For non-guard professions, just close the screen normally
+            if (parentScreen != null) {
+                parentScreen.close();
+            }
+        }
+    }
+
+    /**
+     * Schedules the opening of the GuardRankScreen after a brief delay to allow server processing
+     */
+    private void scheduleGuardRankScreenOpening() {
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        // Schedule the rank screen opening after server has time to process and sync guard data
+        client.execute(() -> {
+            // Wait a few ticks for server processing
+            new Thread(() -> {
+                try {
+                    Thread.sleep(500); // 500ms delay for server processing
+
+                    client.execute(() -> {
+                        openGuardRankScreen();
+                    });
+                } catch (InterruptedException e) {
+                    XeenaaVillagerManager.LOGGER.warn("Guard rank screen opening interrupted", e);
+                }
+            }).start();
+        });
+    }
+
+    /**
+     * Opens the GuardRankScreen for the newly created guard
+     */
+    private void openGuardRankScreen() {
+        try {
+            MinecraftClient client = MinecraftClient.getInstance();
+            ClientGuardDataCache cache = ClientGuardDataCache.getInstance();
+
+            // Try to get guard data from cache
+            GuardData guardData = cache.getGuardData(targetVillager);
+
+            if (guardData != null) {
+                GuardRankScreen rankScreen = new GuardRankScreen(targetVillager, guardData.getRankData());
+                client.setScreen(rankScreen);
+                XeenaaVillagerManager.LOGGER.info("Successfully opened GuardRankScreen for new guard via workflow transition");
+            } else {
+                XeenaaVillagerManager.LOGGER.warn("Guard data not yet available for workflow transition - guard data sync may be delayed");
+                // Could retry here or show a temporary message
+            }
+        } catch (Exception e) {
+            XeenaaVillagerManager.LOGGER.error("Failed to open GuardRankScreen in workflow transition", e);
         }
     }
 
