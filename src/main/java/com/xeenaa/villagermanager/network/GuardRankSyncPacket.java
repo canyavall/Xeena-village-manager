@@ -1,6 +1,7 @@
 package com.xeenaa.villagermanager.network;
 
 import com.xeenaa.villagermanager.data.rank.GuardRank;
+import com.xeenaa.villagermanager.data.rank.GuardPath;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
@@ -12,7 +13,7 @@ import java.util.UUID;
 /**
  * Packet sent from server to client to synchronize guard rank data.
  */
-public record GuardRankSyncPacket(UUID villagerId, GuardRank currentRank, int totalEmeraldsSpent) implements CustomPayload {
+public record GuardRankSyncPacket(UUID villagerId, GuardRank currentRank, int totalEmeraldsSpent, GuardPath chosenPath) implements CustomPayload {
 
     public static final CustomPayload.Id<GuardRankSyncPacket> PACKET_ID =
         new CustomPayload.Id<>(Identifier.of("xeenaa_villager_manager", "guard_rank_sync"));
@@ -24,7 +25,9 @@ public record GuardRankSyncPacket(UUID villagerId, GuardRank currentRank, int to
                 UUID villagerId = Uuids.PACKET_CODEC.decode(buf);
                 GuardRank currentRank = GuardRank.CODEC.decode(buf);
                 int totalEmeraldsSpent = buf.readVarInt();
-                return new GuardRankSyncPacket(villagerId, currentRank, totalEmeraldsSpent);
+                boolean hasChosenPath = buf.readBoolean();
+                GuardPath chosenPath = hasChosenPath ? GuardPath.CODEC.decode(buf) : null;
+                return new GuardRankSyncPacket(villagerId, currentRank, totalEmeraldsSpent, chosenPath);
             }
 
             @Override
@@ -32,6 +35,10 @@ public record GuardRankSyncPacket(UUID villagerId, GuardRank currentRank, int to
                 Uuids.PACKET_CODEC.encode(buf, packet.villagerId);
                 GuardRank.CODEC.encode(buf, packet.currentRank);
                 buf.writeVarInt(packet.totalEmeraldsSpent);
+                buf.writeBoolean(packet.chosenPath != null);
+                if (packet.chosenPath != null) {
+                    GuardPath.CODEC.encode(buf, packet.chosenPath);
+                }
             }
         };
 

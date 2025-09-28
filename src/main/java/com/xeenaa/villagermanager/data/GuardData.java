@@ -8,10 +8,16 @@ import net.minecraft.nbt.NbtCompound;
 import java.util.UUID;
 
 /**
- * Manages persistent role data for Guard villagers.
+ * Manages persistent data for Guard villagers including roles and ranking progression.
  *
- * <p>This class handles NBT serialization/deserialization of guard-specific data
- * including guard role and other persistent state.</p>
+ * <p>This class handles NBT serialization/deserialization of guard-specific data:</p>
+ * <ul>
+ *   <li>Guard roles (AI behavior patterns: Patrol, Guard, Follow)</li>
+ *   <li>Rank progression data (stats, abilities, emerald costs)</li>
+ *   <li>Legacy equipment data compatibility (ignored if present)</li>
+ * </ul>
+ *
+ * <p>The system maintains clean separation between behavioral roles and combat ranking.</p>
  *
  * @since 1.0.0
  */

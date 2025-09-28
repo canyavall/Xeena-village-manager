@@ -127,7 +127,14 @@ public class ProfessionData implements Comparable<ProfessionData> {
         Text translated = Text.translatable(translationKey);
 
         // If translation doesn't exist, format the name manually
-        if (translated.getString().equals(translationKey)) {
+        // Check for both exact match and if the translated text starts with the key
+        // (indicating a missing translation)
+        String translatedString = translated.getString();
+        if (translatedString.equals(translationKey) || translatedString.startsWith("entity.minecraft.villager.")) {
+            // For Guard profession specifically, ensure we show "Guard" not "entity.minecraft.villager.guard"
+            if (id != null && "xeenaa_villager_manager".equals(id.getNamespace()) && "guard".equals(id.getPath())) {
+                return Text.literal("Guard");
+            }
             return Text.literal(formatProfessionName(name));
         }
 
@@ -168,7 +175,13 @@ public class ProfessionData implements Comparable<ProfessionData> {
      */
     private String getTranslationKey(VillagerProfession profession) {
         if (id != null) {
-            return "entity.minecraft.villager." + id.getPath();
+            // For vanilla professions, use the standard pattern
+            if ("minecraft".equals(id.getNamespace())) {
+                return "entity.minecraft.villager." + id.getPath();
+            } else {
+                // For modded professions, use the full namespaced identifier
+                return "entity.minecraft.villager." + id.getNamespace() + "." + id.getPath();
+            }
         }
         return "entity.minecraft.villager.unknown";
     }

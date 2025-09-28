@@ -32,7 +32,7 @@ public class GuardVillagerRenderer extends LivingEntityRenderer<VillagerEntity, 
     public GuardVillagerRenderer(EntityRendererFactory.Context ctx, SimplifiedVillagerModel model) {
         super(ctx, model, 0.5F);
 
-        // Equipment feature removed - ranking system will handle visual elements
+        // Visual equipment features not implemented - ranking system focuses on stats/abilities
 
         LOGGER.info("GuardVillagerRenderer initialized with simplified model");
     }

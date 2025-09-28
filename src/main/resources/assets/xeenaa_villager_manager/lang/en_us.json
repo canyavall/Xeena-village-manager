@@ -44,6 +44,15 @@
   "gui.xeenaa_villager_manager.equipment.role": "Role Selection",
   "gui.xeenaa_villager_manager.equipment.preview": "Preview",
   "gui.xeenaa_villager_manager.equipment.current_role": "Current Role: %s",
+  "gui.xeenaa_villager_manager.guard_profession_change.title": "Guard Profession Change",
+  "gui.xeenaa_villager_manager.guard_profession_change.warning": "Warning: Changing from Guard profession will permanently lose emeralds",
+  "gui.xeenaa_villager_manager.guard_profession_change.current_rank": "Current Rank: %s",
+  "gui.xeenaa_villager_manager.guard_profession_change.new_profession": "New Profession: %s",
+  "gui.xeenaa_villager_manager.guard_profession_change.emerald_loss": "Emeralds Lost: %d emeralds (permanently lost)",
+  "gui.xeenaa_villager_manager.guard_profession_change.no_emerald_loss": "Emeralds Lost: None (no ranks purchased)",
+  "gui.xeenaa_villager_manager.guard_profession_change.confirm_message": "This action cannot be undone. Continue?",
+  "gui.xeenaa_villager_manager.guard_profession_change.confirm": "Confirm",
   "block.xeenaa_villager_manager.guard_post": "Guard Post",
-  "entity.minecraft.villager.xeenaa_villager_manager.guard": "Guard"
+  "entity.minecraft.villager.xeenaa_villager_manager.guard": "Guard",
+  "entity.minecraft.villager.guard": "Guard"
 }

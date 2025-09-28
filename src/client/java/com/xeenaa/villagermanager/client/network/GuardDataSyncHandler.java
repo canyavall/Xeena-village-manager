@@ -2,13 +2,18 @@ package com.xeenaa.villagermanager.client.network;
 
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
 import com.xeenaa.villagermanager.client.data.ClientGuardDataCache;
+import com.xeenaa.villagermanager.client.gui.GuardProfessionChangeScreen;
+import com.xeenaa.villagermanager.client.gui.TabbedManagementScreen;
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.data.rank.GuardRankData;
 import com.xeenaa.villagermanager.network.GuardDataSyncPacket;
+import com.xeenaa.villagermanager.network.GuardEmeraldRefundPacket;
 import com.xeenaa.villagermanager.network.GuardRankSyncPacket;
 import com.xeenaa.villagermanager.network.InitialGuardDataSyncPacket;
+import com.xeenaa.villagermanager.network.RankPurchaseResponsePacket;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +64,12 @@ public class GuardDataSyncHandler {
 
             ClientPlayNetworking.registerGlobalReceiver(GuardRankSyncPacket.PACKET_ID, GuardDataSyncHandler::handleRankSync);
             LOGGER.info("Successfully registered client-side GuardRankSyncPacket handler");
+
+            ClientPlayNetworking.registerGlobalReceiver(GuardEmeraldRefundPacket.PACKET_ID, GuardDataSyncHandler::handleEmeraldLossWarning);
+            LOGGER.info("Successfully registered client-side GuardEmeraldLossWarning handler");
+
+            ClientPlayNetworking.registerGlobalReceiver(RankPurchaseResponsePacket.PACKET_ID, GuardDataSyncHandler::handleRankPurchaseResponse);
+            LOGGER.info("Successfully registered client-side RankPurchaseResponsePacket handler");
         } catch (Exception e) {
             LOGGER.error("Failed to register guard data sync handlers", e);
             throw new RuntimeException("Guard data sync handler registration failed", e);
@@ -346,14 +357,160 @@ public class GuardDataSyncHandler {
             GuardRankData rankData = guardData.getRankData();
             rankData.setCurrentRank(packet.currentRank());
 
+            // CRITICAL FIX: Update totalEmeraldsSpent from packet
+            // This was missing, causing GUI state issues after rank purchases
+            rankData.setTotalEmeraldsSpent(packet.totalEmeraldsSpent());
+
+            // Update chosen path from packet (for path locking)
+            rankData.setChosenPath(packet.chosenPath());
+
             // Update the cache
             cache.updateGuardData(packet.villagerId(), guardData);
 
-            LOGGER.debug("Updated client rank data for villager {}: rank={}, emeralds_spent={}",
+            LOGGER.info("Updated client rank data for villager {}: rank={}, emeralds_spent={}",
                 packet.villagerId(), packet.currentRank().getDisplayName(), packet.totalEmeraldsSpent());
+
+            // CRITICAL FIX: Refresh GUI if management screen is open for this villager
+            // This ensures the rank purchase GUI updates immediately without requiring tab switch
+            refreshManagementScreenIfOpen(client, packet.villagerId());
 
         } catch (Exception e) {
             LOGGER.error("Failed to process rank sync for villager: {}", packet.villagerId(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * Refreshes the villager management screen if it's currently open for the specified villager.
+     * This ensures rank purchases update the GUI immediately without requiring tab switching.
+     *
+     * @param client the Minecraft client instance
+     * @param villagerId the UUID of the villager whose data was updated
+     */
+    private static void refreshManagementScreenIfOpen(MinecraftClient client, java.util.UUID villagerId) {
+        try {
+            Screen currentScreen = client.currentScreen;
+            if (currentScreen instanceof TabbedManagementScreen managementScreen) {
+                // Check if the screen is for the same villager
+                if (managementScreen.getTargetVillager().getUuid().equals(villagerId)) {
+                    managementScreen.refreshActiveTab();
+                    LOGGER.debug("Refreshed management screen for villager {} after rank sync", villagerId);
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Failed to refresh management screen for villager {}: {}", villagerId, e.getMessage());
+        }
+    }
+
+    /**
+     * Handles incoming guard emerald loss warning packets from the server.
+     * Shows the confirmation dialog for profession change with emerald loss warning.
+     */
+    private static void handleEmeraldLossWarning(GuardEmeraldRefundPacket packet, ClientPlayNetworking.Context context) {
+        Objects.requireNonNull(packet, "Guard emerald loss warning packet must not be null");
+        Objects.requireNonNull(context, "Client networking context must not be null");
+
+        packetsReceived++;
+        MinecraftClient client = context.client();
+
+        // Execute on client main thread for thread safety
+        client.execute(() -> {
+            try {
+                processEmeraldLossWarning(packet, client);
+                packetsProcessed++;
+                LOGGER.info("Successfully processed emerald loss warning packet for villager: {} ({} emeralds will be lost)",
+                    packet.villagerId(), packet.totalEmeraldsToRefund());
+            } catch (Exception e) {
+                processingErrors++;
+                LOGGER.error("Error processing emerald loss warning packet for villager {}: {}",
+                    packet.villagerId(), e.getMessage(), e);
+            }
+        });
+    }
+
+    /**
+     * Processes the emerald loss warning packet and shows the confirmation dialog.
+     */
+    private static void processEmeraldLossWarning(GuardEmeraldRefundPacket packet, MinecraftClient client) {
+        Objects.requireNonNull(packet, "Guard emerald loss warning packet must not be null");
+        Objects.requireNonNull(client, "Minecraft client must not be null");
+
+        try {
+            // Create and show the guard profession change confirmation screen
+            GuardProfessionChangeScreen confirmationScreen = new GuardProfessionChangeScreen(
+                client.currentScreen,
+                packet.villagerEntityId(),
+                packet.newProfessionId(),
+                packet.totalEmeraldsToRefund(), // This value represents emeralds to lose, not refund
+                packet.currentRankName()
+            );
+
+            client.setScreen(confirmationScreen);
+
+            LOGGER.info("Opened guard profession change confirmation dialog: villager={}, new_profession={}, emeralds_to_lose={}",
+                packet.villagerId(), packet.newProfessionId(), packet.totalEmeraldsToRefund());
+
+        } catch (Exception e) {
+            LOGGER.error("Failed to process emerald loss warning for villager: {}", packet.villagerId(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * Handles incoming rank purchase response packets from the server.
+     * Shows feedback messages to the player about successful or failed rank purchases.
+     */
+    private static void handleRankPurchaseResponse(RankPurchaseResponsePacket packet, ClientPlayNetworking.Context context) {
+        Objects.requireNonNull(packet, "Rank purchase response packet must not be null");
+        Objects.requireNonNull(context, "Client networking context must not be null");
+
+        packetsReceived++;
+        MinecraftClient client = context.client();
+
+        // Execute on client main thread for thread safety
+        client.execute(() -> {
+            try {
+                processRankPurchaseResponse(packet, client);
+                packetsProcessed++;
+                LOGGER.info("Successfully processed rank purchase response for villager: {} (success: {})",
+                    packet.villagerId(), packet.success());
+            } catch (Exception e) {
+                processingErrors++;
+                LOGGER.error("Error processing rank purchase response for villager {}: {}",
+                    packet.villagerId(), e.getMessage(), e);
+            }
+        });
+    }
+
+    /**
+     * Processes the rank purchase response packet and shows feedback to the player.
+     */
+    private static void processRankPurchaseResponse(RankPurchaseResponsePacket packet, MinecraftClient client) {
+        Objects.requireNonNull(packet, "Rank purchase response packet must not be null");
+        Objects.requireNonNull(client, "Minecraft client must not be null");
+
+        try {
+            if (client.player != null) {
+                if (packet.success()) {
+                    // Show success message in green
+                    client.player.sendMessage(
+                        net.minecraft.text.Text.literal(packet.message()).styled(style -> style.withColor(0x55FF55)),
+                        false
+                    );
+                } else {
+                    // Show error message in red
+                    client.player.sendMessage(
+                        net.minecraft.text.Text.literal(packet.message()).styled(style -> style.withColor(0xFF5555)),
+                        false
+                    );
+                }
+            }
+
+            LOGGER.debug("Displayed rank purchase feedback for villager {}: {}",
+                packet.villagerId(), packet.message());
+
+        } catch (Exception e) {
+            LOGGER.error("Failed to process rank purchase response for villager: {}", packet.villagerId(), e);
             throw e;
         }
     }

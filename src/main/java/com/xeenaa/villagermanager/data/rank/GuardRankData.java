@@ -16,16 +16,19 @@ public class GuardRankData {
     private static final String NBT_VERSION_KEY = "version";
     private static final String NBT_RANK_KEY = "rank";
     private static final String NBT_EMERALDS_SPENT_KEY = "emeralds_spent";
-    private static final int CURRENT_NBT_VERSION = 1;
+    private static final String NBT_CHOSEN_PATH_KEY = "chosen_path";
+    private static final int CURRENT_NBT_VERSION = 2;
 
     private final UUID villagerId;
     private GuardRank currentRank;
     private int totalEmeraldsSpent;
+    private GuardPath chosenPath;
 
     public GuardRankData(UUID villagerId) {
         this.villagerId = villagerId;
         this.currentRank = GuardRank.RECRUIT; // Default starting rank
         this.totalEmeraldsSpent = 0;
+        this.chosenPath = null; // No path chosen initially
     }
 
     public UUID getVillagerId() {
@@ -62,6 +65,23 @@ public class GuardRankData {
     }
 
     /**
+     * Sets the total emeralds spent (used for client synchronization)
+     */
+    public void setTotalEmeraldsSpent(int amount) {
+        this.totalEmeraldsSpent = amount;
+        LOGGER.debug("Set total emeralds spent for villager {}: {}", villagerId, amount);
+    }
+
+    /**
+     * Sets the chosen specialization path (used for client synchronization)
+     */
+    public void setChosenPath(GuardPath path) {
+        this.chosenPath = path;
+        LOGGER.debug("Set chosen path for villager {}: {}", villagerId,
+                    path != null ? path.getDisplayName() : "none");
+    }
+
+    /**
      * Attempts to purchase the specified rank.
      *
      * @param targetRank the rank to purchase
@@ -81,6 +101,12 @@ public class GuardRankData {
             LOGGER.debug("Cannot purchase rank {} for villager {}: insufficient emeralds ({} < {})",
                         targetRank.getDisplayName(), villagerId, playerEmeralds, cost);
             return false;
+        }
+
+        // Set chosen path if this is first specialization purchase
+        if (chosenPath == null && targetRank.getPath() != GuardPath.RECRUIT) {
+            chosenPath = targetRank.getPath();
+            LOGGER.info("Guard {} chose specialization path: {}", villagerId, chosenPath.getDisplayName());
         }
 
         // Purchase successful
@@ -103,6 +129,25 @@ public class GuardRankData {
         if (targetRank == currentRank) return false; // Already have this rank
         if (targetRank == GuardRank.RECRUIT) return false; // Cannot "purchase" recruit rank
 
+        // Check path restrictions
+        GuardPath targetPath = targetRank.getPath();
+
+        // If no path is chosen yet, can choose any specialization path
+        if (chosenPath == null) {
+            // Can only choose first tier specializations from recruit
+            if (currentRank == GuardRank.RECRUIT) {
+                return targetRank == GuardRank.MAN_AT_ARMS_I || targetRank == GuardRank.MARKSMAN_I;
+            }
+            return false; // Should not happen - path should be set after first specialization
+        }
+
+        // If path is already chosen, can only progress within that path
+        if (targetPath != chosenPath) {
+            LOGGER.debug("Cannot purchase rank {} for villager {}: wrong path (chosen: {}, target: {})",
+                        targetRank.getDisplayName(), villagerId, chosenPath.getDisplayName(), targetPath.getDisplayName());
+            return false;
+        }
+
         // Check if previous rank requirement is met
         return targetRank.canPurchase(currentRank);
     }
@@ -113,7 +158,17 @@ public class GuardRankData {
      * @return array of ranks that can be purchased next
      */
     public GuardRank[] getAvailableUpgrades() {
-        return GuardRank.getAvailableUpgrades(currentRank);
+        GuardRank[] allUpgrades = GuardRank.getAvailableUpgrades(currentRank);
+
+        // If no path chosen yet, return all options
+        if (chosenPath == null) {
+            return allUpgrades;
+        }
+
+        // Filter upgrades to only include those in the chosen path
+        return java.util.Arrays.stream(allUpgrades)
+            .filter(rank -> rank.getPath() == chosenPath)
+            .toArray(GuardRank[]::new);
     }
 
     /**
@@ -121,6 +176,37 @@ public class GuardRankData {
      */
     public GuardPath getCurrentPath() {
         return currentRank.getPath();
+    }
+
+    /**
+     * Gets the chosen specialization path (may be null if no path chosen yet).
+     */
+    public GuardPath getChosenPath() {
+        return chosenPath;
+    }
+
+    /**
+     * Checks if a specialization path has been chosen.
+     */
+    public boolean hasChosenPath() {
+        return chosenPath != null;
+    }
+
+    /**
+     * Checks if the given path is available for selection.
+     */
+    public boolean isPathAvailable(GuardPath path) {
+        if (path == GuardPath.RECRUIT) {
+            return false; // Cannot choose recruit as specialization
+        }
+
+        // If no path chosen, all paths are available
+        if (chosenPath == null) {
+            return currentRank == GuardRank.RECRUIT;
+        }
+
+        // If path is chosen, only the chosen path is available
+        return path == chosenPath;
     }
 
     /**
@@ -161,6 +247,9 @@ public class GuardRankData {
         nbt.putInt(NBT_VERSION_KEY, CURRENT_NBT_VERSION);
         nbt.putString(NBT_RANK_KEY, currentRank.getId());
         nbt.putInt(NBT_EMERALDS_SPENT_KEY, totalEmeraldsSpent);
+        if (chosenPath != null) {
+            nbt.putString(NBT_CHOSEN_PATH_KEY, chosenPath.getId());
+        }
         return nbt;
     }
 
@@ -193,13 +282,71 @@ public class GuardRankData {
                 this.totalEmeraldsSpent = 0;
             }
 
-            LOGGER.debug("Loaded rank data for villager {}: rank={}, emeralds_spent={}",
-                        villagerId, currentRank.getDisplayName(), totalEmeraldsSpent);
+            // Load chosen path (version 2+ feature)
+            if (nbt.contains(NBT_CHOSEN_PATH_KEY, NbtElement.STRING_TYPE)) {
+                String pathId = nbt.getString(NBT_CHOSEN_PATH_KEY);
+                this.chosenPath = GuardPath.fromId(pathId);
+                LOGGER.debug("Loaded chosen path {} for villager {}", chosenPath.getDisplayName(), villagerId);
+            } else {
+                // Backward compatibility: infer path from current rank for version 1 data
+                if (version < 2 && currentRank != GuardRank.RECRUIT) {
+                    this.chosenPath = currentRank.getPath();
+                    LOGGER.info("Inferred chosen path {} from current rank for villager {} (version 1 data)",
+                               chosenPath.getDisplayName(), villagerId);
+                } else {
+                    this.chosenPath = null;
+                }
+            }
+
+            // CRITICAL: Validate and fix path consistency for existing data
+            validateAndFixPathConsistency();
+
+            LOGGER.debug("Loaded rank data for villager {}: rank={}, emeralds_spent={}, chosen_path={}",
+                        villagerId, currentRank.getDisplayName(), totalEmeraldsSpent,
+                        chosenPath != null ? chosenPath.getDisplayName() : "none");
 
         } catch (Exception e) {
             LOGGER.error("Failed to load rank data for villager {}, using defaults: {}", villagerId, e.getMessage());
             this.currentRank = GuardRank.RECRUIT;
             this.totalEmeraldsSpent = 0;
+            this.chosenPath = null;
+        }
+    }
+
+    /**
+     * Validates and fixes path consistency for existing data.
+     * This method handles edge cases where guards might have inconsistent path data.
+     */
+    private void validateAndFixPathConsistency() {
+        // If guard is at recruit rank, chosen path should be null
+        if (currentRank == GuardRank.RECRUIT) {
+            if (chosenPath != null && chosenPath != GuardPath.RECRUIT) {
+                LOGGER.warn("Fixed inconsistency: Recruit guard {} had chosen path {}, clearing it",
+                           villagerId, chosenPath.getDisplayName());
+                chosenPath = null;
+            }
+            return;
+        }
+
+        // If guard has a specialized rank but no chosen path, infer it
+        if (chosenPath == null && currentRank != GuardRank.RECRUIT) {
+            chosenPath = currentRank.getPath();
+            LOGGER.info("Fixed missing path: Inferred path {} for guard {} with rank {}",
+                       chosenPath.getDisplayName(), villagerId, currentRank.getDisplayName());
+            return;
+        }
+
+        // If guard has a chosen path that doesn't match their current rank path, fix it
+        if (chosenPath != null && currentRank != GuardRank.RECRUIT) {
+            GuardPath currentRankPath = currentRank.getPath();
+            if (chosenPath != currentRankPath) {
+                LOGGER.warn("Fixed path inconsistency: Guard {} had chosen path {} but current rank {} is from path {}, fixing",
+                           villagerId, chosenPath.getDisplayName(), currentRank.getDisplayName(), currentRankPath.getDisplayName());
+
+                // Prefer to keep the current rank and fix the chosen path
+                // This preserves the guard's actual progression
+                chosenPath = currentRankPath;
+            }
         }
     }
 
@@ -210,12 +357,14 @@ public class GuardRankData {
         GuardRankData copy = new GuardRankData(this.villagerId);
         copy.currentRank = this.currentRank;
         copy.totalEmeraldsSpent = this.totalEmeraldsSpent;
+        copy.chosenPath = this.chosenPath;
         return copy;
     }
 
     @Override
     public String toString() {
-        return String.format("GuardRankData{villager=%s, rank=%s, tier=%d, emeralds=%d}",
-                           villagerId, currentRank.getDisplayName(), getCurrentTier(), totalEmeraldsSpent);
+        return String.format("GuardRankData{villager=%s, rank=%s, tier=%d, emeralds=%d, path=%s}",
+                           villagerId, currentRank.getDisplayName(), getCurrentTier(), totalEmeraldsSpent,
+                           chosenPath != null ? chosenPath.getDisplayName() : "none");
     }
 }

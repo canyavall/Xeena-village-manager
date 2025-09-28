@@ -55,6 +55,16 @@ public abstract class Tab {
     public abstract Text getDisplayName();
 
     /**
+     * Gets the title text to display in the screen header when this tab is active.
+     * By default, returns the display name, but tabs can override for more detailed titles.
+     *
+     * @return the text to display in the screen title area
+     */
+    public Text getTabTitle() {
+        return getDisplayName();
+    }
+
+    /**
      * Checks if this tab is available for the current villager.
      * For example, equipment tabs might only be available for Guard villagers.
      *
@@ -105,6 +115,14 @@ public abstract class Tab {
      */
     public void onActivate() {
         this.active = true;
+    }
+
+    /**
+     * Called to refresh tab content when underlying data changes.
+     * Subclasses can override to update their display without requiring tab switching.
+     */
+    public void refresh() {
+        // Default implementation - subclasses can override
     }
 
     /**

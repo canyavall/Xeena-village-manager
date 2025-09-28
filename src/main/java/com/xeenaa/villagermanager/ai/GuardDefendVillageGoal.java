@@ -2,11 +2,14 @@ package com.xeenaa.villagermanager.ai;
 
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.data.GuardDataManager;
+import com.xeenaa.villagermanager.threat.ThreatDetectionManager;
+import com.xeenaa.villagermanager.threat.ThreatInfo;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.TargetPredicate;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.server.world.ServerWorld;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -17,12 +20,9 @@ import java.util.List;
 public class GuardDefendVillageGoal extends Goal {
     private final VillagerEntity guard;
     private LivingEntity targetEntity;
-    private VillagerEntity villagerToDefend;
+    private LivingEntity entityToDefend;
+    private ThreatInfo currentThreat;
     private int cooldown;
-
-    private static final TargetPredicate VILLAGER_PREDICATE = TargetPredicate.createNonAttackable()
-        .setBaseMaxDistance(16.0)
-        .ignoreVisibility();
 
     public GuardDefendVillageGoal(VillagerEntity guard) {
         this.guard = guard;
@@ -45,56 +45,38 @@ public class GuardDefendVillageGoal extends Goal {
             return false;
         }
 
-        // Find villagers under attack
-        List<VillagerEntity> nearbyVillagers = guard.getWorld().getTargets(
-            VillagerEntity.class,
-            VILLAGER_PREDICATE,
-            guard,
-            guard.getBoundingBox().expand(16.0)
-        );
+        // Use the new threat detection system
+        if (guard.getWorld() instanceof ServerWorld serverWorld) {
+            ThreatDetectionManager threatManager = ThreatDetectionManager.get(serverWorld);
+            ThreatInfo threat = threatManager.detectPrimaryThreat(guard);
 
-        for (VillagerEntity villager : nearbyVillagers) {
-            if (villager == guard) continue;
-
-            LivingEntity attacker = villager.getAttacker();
-            if (attacker != null && attacker instanceof HostileEntity && attacker.isAlive()) {
-                // Found a villager being attacked
-                this.villagerToDefend = villager;
-                this.targetEntity = attacker;
+            if (threat != null && threat.isHighPriority()) {
+                this.currentThreat = threat;
+                this.targetEntity = threat.getThreatEntity();
+                this.entityToDefend = threat.getVictimEntity();
                 return true;
             }
-        }
 
-        // Also check for hostile mobs near villagers
-        List<HostileEntity> nearbyHostiles = guard.getWorld().getEntitiesByClass(
-            HostileEntity.class,
-            guard.getBoundingBox().expand(12.0),
-            hostile -> hostile.isAlive() && guard.canSee(hostile)
-        );
-
-        if (!nearbyHostiles.isEmpty() && !nearbyVillagers.isEmpty()) {
-            // Find the closest hostile to any villager
-            double closestDistance = Double.MAX_VALUE;
-            HostileEntity closestHostile = null;
-            VillagerEntity closestVillager = null;
-
-            for (HostileEntity hostile : nearbyHostiles) {
-                for (VillagerEntity villager : nearbyVillagers) {
-                    if (villager == guard) continue;
-
-                    double distance = hostile.squaredDistanceTo(villager);
-                    if (distance < closestDistance && distance < 64.0) { // Within 8 blocks
-                        closestDistance = distance;
-                        closestHostile = hostile;
-                        closestVillager = villager;
-                    }
+            // Fall back to proximity threats for village defense
+            if (threat != null && threat.isProximityThreat()) {
+                // Only engage proximity threats if guard role allows it
+                switch (guardData.getRole()) {
+                    case PATROL:
+                    case GUARD:
+                        this.currentThreat = threat;
+                        this.targetEntity = threat.getThreatEntity();
+                        this.entityToDefend = threat.getVictimEntity();
+                        return true;
+                    case FOLLOW:
+                        // Follow guards only engage proximity threats near their player
+                        if (isNearAssignedPlayer()) {
+                            this.currentThreat = threat;
+                            this.targetEntity = threat.getThreatEntity();
+                            this.entityToDefend = threat.getVictimEntity();
+                            return true;
+                        }
+                        break;
                 }
-            }
-
-            if (closestHostile != null) {
-                this.targetEntity = closestHostile;
-                this.villagerToDefend = closestVillager;
-                return true;
             }
         }
 
@@ -107,12 +89,24 @@ public class GuardDefendVillageGoal extends Goal {
             return false;
         }
 
-        if (villagerToDefend != null && !villagerToDefend.isAlive()) {
+        if (entityToDefend != null && !entityToDefend.isAlive()) {
             return false;
         }
 
+        // Check if threat is still valid using the threat detection system
+        if (guard.getWorld() instanceof ServerWorld serverWorld && currentThreat != null) {
+            ThreatDetectionManager threatManager = ThreatDetectionManager.get(serverWorld);
+            ThreatInfo updatedThreat = threatManager.getThreatInfo(targetEntity);
+
+            // If threat is no longer detected or priority dropped significantly, stop
+            if (updatedThreat == null || (!updatedThreat.isHighPriority() && !updatedThreat.isProximityThreat())) {
+                return false;
+            }
+        }
+
         // Continue defending until threat is eliminated or too far away
-        return guard.squaredDistanceTo(targetEntity) < 256.0; // 16 blocks
+        double maxDistance = calculateMaxEngagementDistance();
+        return guard.squaredDistanceTo(targetEntity) < maxDistance * maxDistance;
     }
 
     @Override
@@ -120,7 +114,16 @@ public class GuardDefendVillageGoal extends Goal {
         guard.setTarget(targetEntity);
         cooldown = 0;
 
-        // Alert nearby guards
+        // Log threat engagement for debugging
+        if (currentThreat != null) {
+            com.xeenaa.villagermanager.XeenaaVillagerManager.LOGGER.debug(
+                "Guard {} engaging threat: {}",
+                guard.getUuid(),
+                currentThreat.getDescription()
+            );
+        }
+
+        // Alert nearby guards - the threat detection system handles this more efficiently
         alertNearbyGuards();
     }
 
@@ -128,23 +131,46 @@ public class GuardDefendVillageGoal extends Goal {
     public void stop() {
         guard.setTarget(null);
         targetEntity = null;
-        villagerToDefend = null;
+        entityToDefend = null;
+        currentThreat = null;
         cooldown = 40; // 2 second cooldown
     }
 
     private void alertNearbyGuards() {
-        // Find other guards within 32 blocks and alert them
-        List<VillagerEntity> nearbyVillagers = guard.getWorld().getEntitiesByClass(
-            VillagerEntity.class,
-            guard.getBoundingBox().expand(32.0),
-            villager -> villager != guard && isGuard(villager)
-        );
+        // Let the threat detection system handle this more efficiently
+        // The system already alerts guards when high-priority threats are detected
+        if (currentThreat != null && !currentThreat.isHighPriority()) {
+            // Only manually alert for lower priority threats
+            List<VillagerEntity> nearbyGuards = guard.getWorld().getEntitiesByClass(
+                VillagerEntity.class,
+                guard.getBoundingBox().expand(24.0),
+                villager -> villager != guard && isGuard(villager) && villager.getTarget() == null
+            );
 
-        for (VillagerEntity otherGuard : nearbyVillagers) {
-            if (otherGuard.getTarget() == null) {
+            for (VillagerEntity otherGuard : nearbyGuards) {
                 otherGuard.setTarget(targetEntity);
             }
         }
+    }
+
+    private double calculateMaxEngagementDistance() {
+        if (currentThreat == null) {
+            return 16.0; // Default range
+        }
+
+        // Extend range for high priority threats
+        if (currentThreat.isHighPriority()) {
+            return 20.0;
+        }
+
+        // Standard range for proximity threats
+        return 16.0;
+    }
+
+    private boolean isNearAssignedPlayer() {
+        // For follow guards, check if assigned player is nearby
+        // TODO: Implement actual player assignment tracking
+        return guard.getWorld().getClosestPlayer(guard, 32) != null;
     }
 
     private boolean isGuard() {

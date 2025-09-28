@@ -16,6 +16,7 @@ import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.village.VillagerProfession;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +57,37 @@ public class ProfessionTab extends Tab {
     }
 
     @Override
+    public Text getTabTitle() {
+        // Get current profession for context
+        VillagerProfession currentProfession = targetVillager.getVillagerData().getProfession();
+        Identifier professionId = net.minecraft.registry.Registries.VILLAGER_PROFESSION.getId(currentProfession);
+
+        if (professionId != null) {
+            // Create a contextual title with current profession
+            String professionName;
+            if ("minecraft".equals(professionId.getNamespace())) {
+                // Vanilla profession - use simple name
+                professionName = professionId.getPath();
+            } else {
+                // Modded profession - use display name
+                professionName = professionId.getPath();
+            }
+            return Text.literal("Profession - " + capitalize(professionName));
+        }
+        return Text.literal("Profession Selection");
+    }
+
+    /**
+     * Capitalizes the first letter of a string.
+     */
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
+    }
+
+    @Override
     public boolean isAvailable() {
         // Profession tab is always available for valid villagers
         return targetVillager.isAlive() && !targetVillager.isBaby();
@@ -82,13 +114,17 @@ public class ProfessionTab extends Tab {
     }
 
     /**
-     * Loads all available professions based on configuration and mod state.
+     * Loads all available professions based on configuration and mod state, excluding the currently selected profession.
      */
     private void loadAvailableProfessions() {
         availableProfessions.clear();
 
         ProfessionManager manager = ProfessionManager.getInstance();
         ModConfig config = ModConfig.getInstance();
+
+        // Get current profession of the villager
+        VillagerProfession currentProfession = targetVillager.getVillagerData().getProfession();
+        Identifier currentProfessionId = Registries.VILLAGER_PROFESSION.getId(currentProfession);
 
         for (ProfessionData professionData : manager.getAllProfessionData()) {
             // Skip blacklisted professions
@@ -99,6 +135,11 @@ public class ProfessionTab extends Tab {
             // Skip Guard profession if disabled in config
             if (professionData.getId().toString().equals("xeenaa_villager_manager:guard")
                 && !config.isGuardProfessionEnabled()) {
+                continue;
+            }
+
+            // Skip currently selected profession
+            if (professionData.getId().equals(currentProfessionId)) {
                 continue;
             }
 
@@ -205,9 +246,41 @@ public class ProfessionTab extends Tab {
      */
     private void renderCurrentProfessionInfo(DrawContext context) {
         // Get current profession info
-        String currentProfessionKey = targetVillager.getVillagerData().getProfession().toString();
-        Text currentProfessionText = Text.translatable("gui.xeenaa_villager_manager.current_profession",
-            Text.translatable("entity.minecraft.villager." + currentProfessionKey.replace(":", ".")));
+        VillagerProfession currentProfession = targetVillager.getVillagerData().getProfession();
+        Identifier professionId = Registries.VILLAGER_PROFESSION.getId(currentProfession);
+
+        // Get translated profession name using proper key generation
+        Text professionName;
+        if (professionId != null) {
+            String translationKey;
+            if ("minecraft".equals(professionId.getNamespace())) {
+                // Vanilla profession
+                translationKey = "entity.minecraft.villager." + professionId.getPath();
+            } else {
+                // Modded profession - use full namespaced identifier
+                translationKey = "entity.minecraft.villager." + professionId.getNamespace() + "." + professionId.getPath();
+            }
+            Text translated = Text.translatable(translationKey);
+            String translatedString = translated.getString();
+
+            // If translation fails (shows raw key), use fallback
+            if (translatedString.equals(translationKey) || translatedString.startsWith("entity.minecraft.villager.")) {
+                // For Guard profession specifically, ensure we show "Guard" not raw key
+                if ("xeenaa_villager_manager".equals(professionId.getNamespace()) && "guard".equals(professionId.getPath())) {
+                    professionName = Text.literal("Guard");
+                } else {
+                    // Format the profession name nicely
+                    String formattedName = capitalize(professionId.getPath().replace("_", " "));
+                    professionName = Text.literal(formattedName);
+                }
+            } else {
+                professionName = translated;
+            }
+        } else {
+            professionName = Text.literal("Unknown");
+        }
+
+        Text currentProfessionText = Text.translatable("gui.xeenaa_villager_manager.current_profession", professionName);
 
         // Render at bottom left of content area
         int textY = contentY + contentHeight - 35;
@@ -270,6 +343,7 @@ public class ProfessionTab extends Tab {
             }
         }
     }
+
 
     /**
      * Schedules tab refresh and switch to RankTab after a brief delay to allow server processing

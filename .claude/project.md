@@ -138,16 +138,19 @@ Based on the latest commit "new rank system" (3b1b1f0), the following components
 ### Primary Objectives
 1. **Intuitive Villager Management**: Simple, powerful GUI for profession changes
 2. **Guard System Excellence**: Comprehensive guard ranking with meaningful progression
-3. **Mod Compatibility**: Seamless integration with existing Minecraft ecosystem
-4. **Performance Optimization**: Efficient systems that don't impact gameplay
-5. **User Experience**: Professional, polished interface design
+3. **Active Defense AI**: Guards that actively protect villagers and attack threats
+4. **Mod Compatibility**: Seamless integration with existing Minecraft ecosystem
+5. **Performance Optimization**: Efficient systems that don't impact gameplay
+6. **User Experience**: Professional, polished interface design
 
 ### Success Metrics
 - ✅ Profession management fully functional across all villager types
 - ✅ Guard ranking system provides meaningful progression
 - ✅ No conflicts with vanilla trading or other mod systems
 - ✅ Stable multiplayer synchronization
-- 🔄 Comprehensive testing and quality assurance
+- ✅ Comprehensive testing and quality assurance (Stage 1 Complete)
+- 🔄 **Phase 2 Active**: Guard AI actively defends villagers and fights hostile mobs
+- 🔄 **Phase 2 Active**: Combat effectiveness scales with guard rank and specialization
 
 ## Technical Requirements
 
@@ -169,24 +172,36 @@ Based on the latest commit "new rank system" (3b1b1f0), the following components
 - Distance-based interaction validation
 - Currency transaction integrity
 
-## Future Enhancement Opportunities
+## Phase 2: Guard AI and Combat System (Active Development)
 
-### Potential Features
-- Advanced AI behaviors for different guard roles
-- Combat integration with rank bonuses
-- Visual rank progression (armor, weapons, insignia)
-- Administrative tools for server management
-- Integration with other villager enhancement mods
+### Immediate Development Focus
+- **Villager Protection AI**: Guards detect threats near other villagers and respond
+- **Hostile Mob Targeting**: Automated targeting and engagement of dangerous entities
+- **Combat Behaviors**: Melee vs ranged combat patterns based on specialization
+- **Rank-Scaled Combat**: Higher ranks deal more damage and have better AI
+- **Pathfinding Integration**: Smart movement for combat positioning and patrol
 
-### Performance Optimizations
-- Caching improvements for large villages
-- Network packet optimization
-- Rendering performance enhancements
-- Memory usage optimization
+### Future Enhancement Opportunities (Phase 3+)
+- **Advanced AI Behaviors**: Different guard roles (patrol, sentry, escort)
+- **Visual Equipment Display**: Rank-appropriate armor and weapon rendering
+- **Administrative Tools**: Server management for guard behavior configuration
+- **Integration Expansion**: Enhanced compatibility with other villager enhancement mods
+
+### Performance Optimizations (Ongoing)
+- AI performance optimization for large guard populations
+- Combat calculation efficiency improvements
+- Network packet optimization for AI state synchronization
+- Memory usage optimization for AI behavior trees
 
 ---
 
-**Project Status**: Active Development - Rank System Integration Phase
-**Last Updated**: September 23, 2025
-**Current Focus**: Testing and refining the newly implemented rank system
-**Next Priorities**: Quality assurance, cleanup of legacy systems, and polish
+**Project Status**: PHASE 2 DEVELOPMENT - GUARD AI AND COMBAT 🛡️
+**Last Updated**: September 28, 2025
+**Major Achievement**: Phase 1 Complete - All core systems validated and production-ready!
+**Current Focus**: Guard AI implementation for active villager defense and combat
+**Phase 2 Priorities**:
+1. **Guard Defense AI**: Implement villager protection behaviors
+2. **Combat System**: Add mob targeting and combat AI
+3. **Rank Integration**: Scale combat effectiveness with guard progression
+4. **Performance Optimization**: Ensure AI systems are efficient at scale
+5. **Testing and Validation**: Comprehensive AI behavior testing

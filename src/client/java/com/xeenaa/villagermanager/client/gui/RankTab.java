@@ -13,9 +13,11 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.item.Items;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -48,6 +50,13 @@ public class RankTab extends Tab {
     private static final int WARNING_COLOR = 0xFFFF9800;
     private static final int ERROR_COLOR = 0xFFF44336;
 
+    // Enhanced color scheme for affordability indicators
+    private static final int AFFORDABLE_COLOR = 0xFF4CAF50;     // Green for affordable
+    private static final int UNAFFORDABLE_COLOR = 0xFFF44336;   // Red for unaffordable
+    private static final int EMERALD_COLOR = 0xFF00C851;        // Bright green for emerald count
+    private static final int COST_LABEL_COLOR = 0xFFBDBDBD;     // Gray for labels
+    private static final int DISABLED_COLOR = 0xFF757575;       // Gray for disabled elements
+
     // UI Elements
     private final List<ButtonWidget> pathButtons = new ArrayList<>();
     private final List<ButtonWidget> roleButtons = new ArrayList<>();
@@ -65,6 +74,19 @@ public class RankTab extends Tab {
     @Override
     public Text getDisplayName() {
         return Text.literal("Rank");
+    }
+
+    @Override
+    public Text getTabTitle() {
+        if (rankData != null) {
+            GuardRank currentRank = rankData.getCurrentRank();
+            if (currentRank == GuardRank.RECRUIT) {
+                return Text.literal("Guard Ranking - Choose Path");
+            } else {
+                return Text.literal("Guard Ranking - " + currentRank.getDisplayName());
+            }
+        }
+        return Text.literal("Guard Ranking");
     }
 
     @Override
@@ -91,6 +113,18 @@ public class RankTab extends Tab {
     public void onActivate() {
         super.onActivate();
         refreshData();
+        // Ensure title is set properly on first activation
+        loadGuardData();
+    }
+
+    @Override
+    public void refresh() {
+        // Called when underlying data changes (e.g., rank purchase complete)
+        refreshData();
+
+        // CRITICAL FIX: Recreate UI elements to show updated rank progression
+        // This ensures buttons display the correct next rank after purchase
+        updateLayout();
     }
 
     private void loadGuardData() {
@@ -132,8 +166,7 @@ public class RankTab extends Tab {
 
         currentY += SECTION_SPACING;
 
-        // Role selection section (removed - not needed per user feedback)
-        // createRoleButtons(currentY);
+        // Role selection UI integrated with Guard data - roles managed server-side
     }
 
     private int createPathSelectionButtons(int startY) {
@@ -144,19 +177,25 @@ public class RankTab extends Tab {
         int leftX = contentX + PANEL_SPACING * 2;
         int rightX = contentX + PANEL_SPACING * 2 + buttonWidth + PANEL_SPACING;
 
-        // Melee Path Button
-        ButtonWidget meleeButton = ButtonWidget.builder(
-            Text.literal("⚔ Melee Path").styled(style -> style.withColor(0xFFE57373)),
-            button -> purchaseRank(GuardRank.MAN_AT_ARMS_I)
-        )
+        // Check path availability for initial button styling
+        boolean meleePathAvailable = rankData.isPathAvailable(GuardPath.MELEE);
+        boolean rangedPathAvailable = rankData.isPathAvailable(GuardPath.RANGED);
+
+        // Melee Path Button - adjust color based on availability
+        Text meleeText = Text.literal("⚔ Melee Path").styled(style ->
+            style.withColor(meleePathAvailable ? 0xFFE57373 : DISABLED_COLOR));
+
+        ButtonWidget meleeButton = ButtonWidget.builder(meleeText,
+            button -> purchaseRank(GuardRank.MAN_AT_ARMS_I))
         .dimensions(leftX, startY, buttonWidth, BUTTON_HEIGHT + 10)
         .build();
 
-        // Ranged Path Button
-        ButtonWidget rangedButton = ButtonWidget.builder(
-            Text.literal("🏹 Ranged Path").styled(style -> style.withColor(0xFF81C784)),
-            button -> purchaseRank(GuardRank.MARKSMAN_I)
-        )
+        // Ranged Path Button - adjust color based on availability
+        Text rangedText = Text.literal("🏹 Ranged Path").styled(style ->
+            style.withColor(rangedPathAvailable ? 0xFF81C784 : DISABLED_COLOR));
+
+        ButtonWidget rangedButton = ButtonWidget.builder(rangedText,
+            button -> purchaseRank(GuardRank.MARKSMAN_I))
         .dimensions(rightX, startY, buttonWidth, BUTTON_HEIGHT + 10)
         .build();
 
@@ -179,7 +218,7 @@ public class RankTab extends Tab {
             Text buttonText = Text.literal("Upgrade to " + nextRank.getDisplayName())
                 .append(Text.literal(" (").styled(style -> style.withColor(0xFFBDBDBD)))
                 .append(Text.literal(cost + " emeralds").styled(style ->
-                    style.withColor(canAfford ? SUCCESS_COLOR : ERROR_COLOR)))
+                    style.withColor(canAfford ? AFFORDABLE_COLOR : UNAFFORDABLE_COLOR)))
                 .append(Text.literal(")").styled(style -> style.withColor(0xFFBDBDBD)));
 
             upgradeButton = ButtonWidget.builder(buttonText, button -> purchaseRank(nextRank))
@@ -216,15 +255,40 @@ public class RankTab extends Tab {
     }
 
     private void updateButtonStates() {
-        // Update path buttons
-        for (ButtonWidget button : pathButtons) {
-            button.active = true; // Recruits can always choose a path
+        // Update path buttons with proper path locking logic
+        if (pathButtons.size() >= 2) {
+            ButtonWidget meleeButton = pathButtons.get(0);
+            ButtonWidget rangedButton = pathButtons.get(1);
+
+            // Check path availability and affordability
+            boolean meleePathAvailable = rankData.isPathAvailable(GuardPath.MELEE);
+            boolean rangedPathAvailable = rankData.isPathAvailable(GuardPath.RANGED);
+            int meleeCost = GuardRank.MAN_AT_ARMS_I.getEmeraldCost();
+            int rangedCost = GuardRank.MARKSMAN_I.getEmeraldCost();
+            boolean canAffordMelee = playerEmeralds >= meleeCost;
+            boolean canAffordRanged = playerEmeralds >= rangedCost;
+
+            // Set button states and tooltips
+            meleeButton.active = meleePathAvailable && canAffordMelee;
+            rangedButton.active = rangedPathAvailable && canAffordRanged;
+
+            // Update tooltips with path lock information
+            updatePathButtonTooltips(meleeButton, rangedButton,
+                meleePathAvailable, rangedPathAvailable,
+                canAffordMelee, canAffordRanged,
+                meleeCost, rangedCost);
         }
 
         // Update upgrade button
         if (upgradeButton != null) {
             GuardRank nextRank = rankData.getCurrentRank().getNextRank();
-            upgradeButton.active = nextRank != null && playerEmeralds >= nextRank.getEmeraldCost();
+            boolean canAfford = nextRank != null && playerEmeralds >= nextRank.getEmeraldCost();
+            upgradeButton.active = canAfford;
+
+            // Update upgrade button tooltip
+            if (nextRank != null) {
+                updateUpgradeButtonTooltip(upgradeButton, nextRank, canAfford);
+            }
         }
 
         // Update role buttons - highlight current role
@@ -246,6 +310,62 @@ public class RankTab extends Tab {
 
         // TODO: Create SetGuardRolePacket when role management is implemented
         XeenaaVillagerManager.LOGGER.warn("Role setting not yet implemented - packet needed");
+    }
+
+    /**
+     * Updates tooltips for path selection buttons with detailed information.
+     */
+    private void updatePathButtonTooltips(ButtonWidget meleeButton, ButtonWidget rangedButton,
+            boolean meleePathAvailable, boolean rangedPathAvailable,
+            boolean canAffordMelee, boolean canAffordRanged,
+            int meleeCost, int rangedCost) {
+
+        // Melee button tooltip
+        if (!meleePathAvailable && rankData.hasChosenPath()) {
+            meleeButton.setTooltip(Tooltip.of(Text.literal(
+                "Path locked: Guard specialized as " + rankData.getChosenPath().getDisplayName())
+                .formatted(Formatting.RED)));
+        } else {
+            String meleeTooltip = String.format("Cost: %d emeralds\nYou have: %d emeralds",
+                meleeCost, playerEmeralds);
+            if (!canAffordMelee) {
+                meleeTooltip += String.format("\nNeed %d more emeralds", meleeCost - playerEmeralds);
+            }
+            meleeButton.setTooltip(Tooltip.of(Text.literal(meleeTooltip)
+                .formatted(canAffordMelee ? Formatting.GREEN : Formatting.RED)));
+        }
+
+        // Ranged button tooltip
+        if (!rangedPathAvailable && rankData.hasChosenPath()) {
+            rangedButton.setTooltip(Tooltip.of(Text.literal(
+                "Path locked: Guard specialized as " + rankData.getChosenPath().getDisplayName())
+                .formatted(Formatting.RED)));
+        } else {
+            String rangedTooltip = String.format("Cost: %d emeralds\nYou have: %d emeralds",
+                rangedCost, playerEmeralds);
+            if (!canAffordRanged) {
+                rangedTooltip += String.format("\nNeed %d more emeralds", rangedCost - playerEmeralds);
+            }
+            rangedButton.setTooltip(Tooltip.of(Text.literal(rangedTooltip)
+                .formatted(canAffordRanged ? Formatting.GREEN : Formatting.RED)));
+        }
+    }
+
+    /**
+     * Updates tooltip for upgrade button with detailed cost information.
+     */
+    private void updateUpgradeButtonTooltip(ButtonWidget upgradeButton, GuardRank nextRank, boolean canAfford) {
+        int cost = nextRank.getEmeraldCost();
+        String tooltipText = String.format("Cost: %d emeralds\nYou have: %d emeralds", cost, playerEmeralds);
+
+        if (!canAfford) {
+            tooltipText += String.format("\nNeed %d more emeralds", cost - playerEmeralds);
+        } else {
+            tooltipText += String.format("\n%d emeralds remaining after purchase", playerEmeralds - cost);
+        }
+
+        upgradeButton.setTooltip(Tooltip.of(Text.literal(tooltipText)
+            .formatted(canAfford ? Formatting.GREEN : Formatting.RED)));
     }
 
     private void clearButtons() {
@@ -371,23 +491,124 @@ public class RankTab extends Tab {
     }
 
     private void renderEmeraldBalance(DrawContext context) {
-        int balanceY = contentY + contentHeight - 40;
+        int balanceY = contentY + contentHeight - 55; // Moved up to make room for cost section
 
-        String balanceText = String.format("Emeralds: %d", playerEmeralds);
-        context.drawText(getTextRenderer(), Text.literal(balanceText),
-            contentX + 10, balanceY, 0xFF4CAF50, false);
+        // Enhanced emerald balance display
+        renderCostInformationSection(context, balanceY);
+    }
 
-        // Show cost for next upgrade
+    /**
+     * Renders comprehensive cost information section with clear affordability indicators.
+     * Always shows costs regardless of player emerald count.
+     */
+    private void renderCostInformationSection(DrawContext context, int startY) {
+        // Background panel for cost information
+        int panelHeight = 45;
+        context.fill(contentX + 4, startY - 5, contentX + contentWidth - 4, startY + panelHeight, 0xFF2A2A2A);
+        context.drawBorder(contentX + 4, startY - 5, contentWidth - 8, panelHeight, 0xFF404040);
+
+        // Player emerald count - always visible
+        String emeraldText = String.format("You have: %d emeralds", playerEmeralds);
+        context.drawText(getTextRenderer(), Text.literal(emeraldText),
+            contentX + 10, startY, EMERALD_COLOR, false);
+
+        // Cost information - always shown regardless of rank state
         GuardRank currentRank = rankData.getCurrentRank();
+
+        if (currentRank == GuardRank.RECRUIT) {
+            // Show both path costs for recruits
+            renderRecruitPathCosts(context, startY + 12);
+        } else {
+            // Show next upgrade cost or max rank status
+            renderUpgradeCosts(context, startY + 12, currentRank);
+        }
+    }
+
+    /**
+     * Renders cost information for recruit path selection.
+     */
+    private void renderRecruitPathCosts(DrawContext context, int y) {
+        int meleePathCost = GuardRank.MAN_AT_ARMS_I.getEmeraldCost();
+        int rangedPathCost = GuardRank.MARKSMAN_I.getEmeraldCost();
+
+        // Melee path cost
+        boolean canAffordMelee = playerEmeralds >= meleePathCost;
+        int meleeColor = canAffordMelee ? AFFORDABLE_COLOR : UNAFFORDABLE_COLOR;
+        String meleeText = String.format("⚔ Melee Path: %d emeralds", meleePathCost);
+        context.drawText(getTextRenderer(), Text.literal(meleeText),
+            contentX + 10, y, meleeColor, false);
+
+        // Ranged path cost
+        boolean canAffordRanged = playerEmeralds >= rangedPathCost;
+        int rangedColor = canAffordRanged ? AFFORDABLE_COLOR : UNAFFORDABLE_COLOR;
+        String rangedText = String.format("🏹 Ranged Path: %d emeralds", rangedPathCost);
+        context.drawText(getTextRenderer(), Text.literal(rangedText),
+            contentX + 10, y + 12, rangedColor, false);
+
+        // Affordability status indicator
+        if (!canAffordMelee && !canAffordRanged) {
+            String statusText = "❌ Cannot afford any path upgrades";
+            context.drawText(getTextRenderer(), Text.literal(statusText),
+                contentX + contentWidth - getTextRenderer().getWidth(statusText) - 10, y + 6, UNAFFORDABLE_COLOR, false);
+        } else if (canAffordMelee && canAffordRanged) {
+            String statusText = "✓ Can afford both paths";
+            context.drawText(getTextRenderer(), Text.literal(statusText),
+                contentX + contentWidth - getTextRenderer().getWidth(statusText) - 10, y + 6, AFFORDABLE_COLOR, false);
+        } else {
+            String statusText = String.format("⚠ Can afford %s path only", canAffordMelee ? "melee" : "ranged");
+            context.drawText(getTextRenderer(), Text.literal(statusText),
+                contentX + contentWidth - getTextRenderer().getWidth(statusText) - 10, y + 6, WARNING_COLOR, false);
+        }
+    }
+
+    /**
+     * Renders cost information for rank upgrades.
+     */
+    private void renderUpgradeCosts(DrawContext context, int y, GuardRank currentRank) {
         GuardRank nextRank = currentRank.getNextRank();
 
         if (nextRank != null) {
             int cost = nextRank.getEmeraldCost();
-            String costText = String.format("Next upgrade: %d emeralds", cost);
-            int textWidth = getTextRenderer().getWidth(costText);
-            int color = playerEmeralds >= cost ? SUCCESS_COLOR : ERROR_COLOR;
+            boolean canAfford = playerEmeralds >= cost;
+
+            // Next rank cost - always visible
+            String costLabel = "Next rank cost:";
+            context.drawText(getTextRenderer(), Text.literal(costLabel),
+                contentX + 10, y, COST_LABEL_COLOR, false);
+
+            String costText = String.format("%d emeralds", cost);
+            int costColor = canAfford ? AFFORDABLE_COLOR : UNAFFORDABLE_COLOR;
             context.drawText(getTextRenderer(), Text.literal(costText),
-                contentX + contentWidth - textWidth - 10, balanceY, color, false);
+                contentX + 110, y, costColor, false);
+
+            // Affordability status with emerald difference
+            String statusText;
+            int statusColor;
+            if (canAfford) {
+                int remaining = playerEmeralds - cost;
+                statusText = String.format("✓ Affordable (%d emeralds remaining)", remaining);
+                statusColor = AFFORDABLE_COLOR;
+            } else {
+                int needed = cost - playerEmeralds;
+                statusText = String.format("❌ Need %d more emeralds", needed);
+                statusColor = UNAFFORDABLE_COLOR;
+            }
+
+            int statusWidth = getTextRenderer().getWidth(statusText);
+            context.drawText(getTextRenderer(), Text.literal(statusText),
+                contentX + contentWidth - statusWidth - 10, y, statusColor, false);
+
+            // Next rank name
+            String nextRankText = String.format("→ %s", nextRank.getDisplayName());
+            context.drawText(getTextRenderer(), Text.literal(nextRankText),
+                contentX + 10, y + 12, ACCENT_COLOR, false);
+        } else {
+            // Maximum rank achieved
+            String maxRankText = "🏆 Maximum rank achieved";
+            int textWidth = getTextRenderer().getWidth(maxRankText);
+            int centerX = contentX + (contentWidth - textWidth) / 2;
+            context.drawText(getTextRenderer(), Text.literal(maxRankText),
+                centerX, y + 6, 0xFFFFD700, false); // Gold color
         }
     }
 

@@ -2,11 +2,15 @@ package com.xeenaa.villagermanager;
 
 import com.xeenaa.villagermanager.block.ModBlocks;
 import com.xeenaa.villagermanager.config.ModConfig;
+import com.xeenaa.villagermanager.event.ThreatEventHandler;
 import com.xeenaa.villagermanager.network.SelectProfessionPacket;
 import com.xeenaa.villagermanager.network.GuardDataSyncPacket;
+import com.xeenaa.villagermanager.network.GuardEmeraldRefundPacket;
+import com.xeenaa.villagermanager.network.GuardProfessionChangePacket;
 import com.xeenaa.villagermanager.network.InitialGuardDataSyncPacket;
 import com.xeenaa.villagermanager.network.GuardRankSyncPacket;
 import com.xeenaa.villagermanager.network.PurchaseRankPacket;
+import com.xeenaa.villagermanager.network.RankPurchaseResponsePacket;
 import com.xeenaa.villagermanager.network.PlayerJoinHandler;
 import com.xeenaa.villagermanager.network.ServerPacketHandler;
 import com.xeenaa.villagermanager.profession.ModProfessions;
@@ -65,9 +69,12 @@ public class XeenaaVillagerManager implements ModInitializer {
         // Register network packets
         PayloadTypeRegistry.playC2S().register(SelectProfessionPacket.PACKET_ID, SelectProfessionPacket.CODEC);
         PayloadTypeRegistry.playC2S().register(PurchaseRankPacket.PACKET_ID, PurchaseRankPacket.CODEC);
+        PayloadTypeRegistry.playC2S().register(GuardProfessionChangePacket.PACKET_ID, GuardProfessionChangePacket.CODEC);
         PayloadTypeRegistry.playS2C().register(GuardDataSyncPacket.ID, GuardDataSyncPacket.CODEC);
+        PayloadTypeRegistry.playS2C().register(GuardEmeraldRefundPacket.PACKET_ID, GuardEmeraldRefundPacket.CODEC);
         PayloadTypeRegistry.playS2C().register(InitialGuardDataSyncPacket.PACKET_ID, InitialGuardDataSyncPacket.CODEC);
         PayloadTypeRegistry.playS2C().register(GuardRankSyncPacket.PACKET_ID, GuardRankSyncPacket.CODEC);
+        PayloadTypeRegistry.playS2C().register(RankPurchaseResponsePacket.PACKET_ID, RankPurchaseResponsePacket.CODEC);
 
         // Register server-side packet handlers
         ServerPacketHandler.registerHandlers();
@@ -75,8 +82,12 @@ public class XeenaaVillagerManager implements ModInitializer {
         // Register player join handler for initial guard data sync
         PlayerJoinHandler.register();
 
+        // Initialize threat detection system
+        LOGGER.info("Initializing threat detection system for guard villagers");
+        ThreatEventHandler.initialize();
+
         // Final initialization complete message
-        LOGGER.info("Xeenaa Villager Manager initialization complete - Custom Guard profession available");
+        LOGGER.info("Xeenaa Villager Manager initialization complete - Guard profession with threat detection ready");
 
         // Note: Villager interaction event registration moved to client-side
     }

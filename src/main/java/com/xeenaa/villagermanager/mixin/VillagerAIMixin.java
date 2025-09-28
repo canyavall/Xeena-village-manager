@@ -2,7 +2,9 @@ package com.xeenaa.villagermanager.mixin;
 
 import com.xeenaa.villagermanager.ai.GuardAttackGoal;
 import com.xeenaa.villagermanager.ai.GuardDefendVillageGoal;
+import com.xeenaa.villagermanager.ai.GuardFollowVillagerGoal;
 import com.xeenaa.villagermanager.ai.GuardMeleeAttackGoal;
+import com.xeenaa.villagermanager.ai.GuardPatrolGoal;
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.profession.ModProfessions;
 import com.xeenaa.villagermanager.data.GuardDataManager;
@@ -90,9 +92,18 @@ public abstract class VillagerAIMixin extends MerchantEntity {
             goal.getGoal() instanceof FleeEntityGoal
         );
 
-        // Add guard-specific goals
+        // Add guard-specific goals with proper priorities
+        // Priority 1-2: High priority combat goals
         this.goalSelector.add(1, new GuardDefendVillageGoal(self));
         this.goalSelector.add(2, new GuardMeleeAttackGoal(self, 1.0, false));
+
+        // Priority 5: Medium-low priority - follow villagers for protection
+        this.goalSelector.add(5, new GuardFollowVillagerGoal(self));
+
+        // Priority 7: Low priority - patrol when no other tasks
+        this.goalSelector.add(7, new GuardPatrolGoal(self));
+
+        // Target selector for hostile detection
         this.targetSelector.add(1, new GuardAttackGoal(self));
     }
 
@@ -101,7 +112,9 @@ public abstract class VillagerAIMixin extends MerchantEntity {
         // Remove guard-specific goals
         this.goalSelector.getGoals().removeIf(goal ->
             goal.getGoal() instanceof GuardDefendVillageGoal ||
-            goal.getGoal() instanceof GuardMeleeAttackGoal
+            goal.getGoal() instanceof GuardMeleeAttackGoal ||
+            goal.getGoal() instanceof GuardFollowVillagerGoal ||
+            goal.getGoal() instanceof GuardPatrolGoal
         );
 
         this.targetSelector.getGoals().removeIf(goal ->

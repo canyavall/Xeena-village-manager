@@ -235,12 +235,24 @@ public class TabbedManagementScreen extends Screen {
      * Renders the screen title.
      */
     private void renderTitle(DrawContext context) {
-        Text title = getTitle();
+        Text title = getCurrentTitle();
         int titleWidth = textRenderer.getWidth(title);
         int titleX = backgroundX + (BACKGROUND_WIDTH - titleWidth) / 2;
         int titleY = backgroundY + 8;
 
         context.drawText(textRenderer, title, titleX, titleY, 0xFFFFFF, true);
+    }
+
+    /**
+     * Gets the current title to display, incorporating active tab information.
+     *
+     * @return the title text for the current state
+     */
+    private Text getCurrentTitle() {
+        if (activeTab != null) {
+            return activeTab.getTabTitle();
+        }
+        return getTitle(); // Fallback to default screen title
     }
 
     @Override
@@ -290,6 +302,16 @@ public class TabbedManagementScreen extends Screen {
     }
 
     /**
+     * Refreshes the currently active tab to update its content.
+     * Used when underlying data changes and GUI needs to update without tab switching.
+     */
+    public void refreshActiveTab() {
+        if (activeTab != null) {
+            activeTab.refresh();
+        }
+    }
+
+    /**
      * Adds a tab to the screen. Should be called during {@link #initializeTabs()}.
      *
      * @param tab the tab to add, must not be null
@@ -313,11 +335,13 @@ public class TabbedManagementScreen extends Screen {
         }
         tabs.clear();
         tabButtons.clear();
+        clearChildren(); // Clear existing UI widgets
         activeTab = null;
 
         // Reinitialize tabs
         initializeTabs();
         calculateLayout();
+        createTabButtons(); // Create new tab buttons after refreshing tabs
 
         // Try to restore previous active tab or switch to a specific tab
         Tab tabToActivate = null;

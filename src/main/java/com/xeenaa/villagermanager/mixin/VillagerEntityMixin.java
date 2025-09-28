@@ -3,17 +3,21 @@ package com.xeenaa.villagermanager.mixin;
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.data.GuardDataManager;
+import com.xeenaa.villagermanager.data.rank.GuardRank;
+import com.xeenaa.villagermanager.data.rank.GuardRankData;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.passive.MerchantEntity;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Mixin to handle guard data persistence for villagers.
@@ -87,4 +91,5 @@ public abstract class VillagerEntityMixin extends MerchantEntity {
         Identifier currentProfession = Identifier.of(professionString);
         return GUARD_PROFESSION_ID.equals(currentProfession);
     }
+
 }
