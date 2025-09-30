@@ -32,9 +32,10 @@ public class GuardVillagerRenderer extends LivingEntityRenderer<VillagerEntity, 
     public GuardVillagerRenderer(EntityRendererFactory.Context ctx, SimplifiedVillagerModel model) {
         super(ctx, model, 0.5F);
 
-        // Visual equipment features not implemented - ranking system focuses on stats/abilities
+        // Add held item renderer so guards can visually hold weapons
+        this.addFeature(new net.minecraft.client.render.entity.feature.HeldItemFeatureRenderer<>(this, ctx.getHeldItemRenderer()));
 
-        LOGGER.info("GuardVillagerRenderer initialized with simplified model");
+        LOGGER.info("GuardVillagerRenderer initialized with simplified model and held item renderer");
     }
 
     @Override

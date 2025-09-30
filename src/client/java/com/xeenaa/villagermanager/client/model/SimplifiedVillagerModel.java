@@ -5,15 +5,17 @@ import net.fabricmc.api.Environment;
 import net.minecraft.client.model.*;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.entity.model.EntityModel;
+import net.minecraft.client.render.entity.model.ModelWithArms;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.passive.VillagerEntity;
 
 /**
  * Simplified villager model without overlay/blending logic.
  * This model renders a single texture without biome/level overlays.
+ * Implements ModelWithArms to support held item rendering.
  */
 @Environment(EnvType.CLIENT)
-public class SimplifiedVillagerModel extends EntityModel<VillagerEntity> {
+public class SimplifiedVillagerModel extends EntityModel<VillagerEntity> implements ModelWithArms {
     public final ModelPart root;
     public final ModelPart head;
     public final ModelPart body;
@@ -93,9 +95,37 @@ public class SimplifiedVillagerModel extends EntityModel<VillagerEntity> {
         this.rightLeg.pitch = (float) (Math.cos(limbAngle * 0.6662F) * 1.4F * limbDistance);
         this.leftLeg.pitch = (float) (Math.cos(limbAngle * 0.6662F + Math.PI) * 1.4F * limbDistance);
 
-        // Arm animations
+        // Arm animations - base walking animation
         this.rightArm.pitch = (float) (Math.cos(limbAngle * 0.6662F + Math.PI) * 2.0F * limbDistance * 0.5F);
         this.leftArm.pitch = (float) (Math.cos(limbAngle * 0.6662F) * 2.0F * limbDistance * 0.5F);
+
+        // Attack animation - swing the right arm when attacking
+        if (entity.handSwingProgress > 0.0F) {
+            // Calculate swing progress (0.0 to 1.0)
+            float swingProgress = entity.getHandSwingProgress(animationProgress);
+
+            // Determine which arm is swinging
+            net.minecraft.util.Arm arm = entity.preferredHand == net.minecraft.util.Hand.MAIN_HAND
+                ? entity.getMainArm()
+                : entity.getMainArm().getOpposite();
+
+            ModelPart swingingArm = arm == net.minecraft.util.Arm.RIGHT ? this.rightArm : this.leftArm;
+
+            // Animate the swing - raise arm up and swing down
+            float swingAngle = net.minecraft.util.math.MathHelper.sin(swingProgress * (float) Math.PI);
+            float swingRotation = net.minecraft.util.math.MathHelper.sin((1.0F - (1.0F - swingProgress) * (1.0F - swingProgress)) * (float) Math.PI);
+
+            swingingArm.roll = 0.0F;
+            swingingArm.yaw = -(0.1F - swingAngle * 0.6F);
+            swingingArm.pitch = -1.5707964F; // -90 degrees - raise arm up
+            swingingArm.pitch -= swingAngle * 1.2F - swingRotation * 0.4F; // Swing motion
+        } else {
+            // Reset arm rotations when not attacking
+            this.rightArm.roll = 0.0F;
+            this.rightArm.yaw = 0.0F;
+            this.leftArm.roll = 0.0F;
+            this.leftArm.yaw = 0.0F;
+        }
     }
 
     @Override
@@ -119,5 +149,22 @@ public class SimplifiedVillagerModel extends EntityModel<VillagerEntity> {
         target.leftArm.copyTransform(this.leftArm);
         target.rightLeg.copyTransform(this.rightLeg);
         target.leftLeg.copyTransform(this.leftLeg);
+    }
+
+    /**
+     * Required by ModelWithArms interface - sets the angle of both arms.
+     * This is used by HeldItemFeatureRenderer to position held items correctly.
+     */
+    @Override
+    public void setArmAngle(net.minecraft.util.Arm arm, MatrixStack matrices) {
+        ModelPart modelPart = this.getArm(arm);
+        modelPart.rotate(matrices);
+    }
+
+    /**
+     * Helper method to get the arm model part based on which arm (left or right).
+     */
+    private ModelPart getArm(net.minecraft.util.Arm arm) {
+        return arm == net.minecraft.util.Arm.LEFT ? this.leftArm : this.rightArm;
     }
 }

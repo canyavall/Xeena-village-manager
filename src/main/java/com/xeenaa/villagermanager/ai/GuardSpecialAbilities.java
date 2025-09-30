@@ -8,6 +8,7 @@ import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
+import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -296,7 +297,7 @@ public class GuardSpecialAbilities {
     // Ranged ability implementations
     private boolean executePrecisionShot(LivingEntity target) {
         ItemStack arrow = new ItemStack(Items.ARROW);
-        PersistentProjectileEntity projectile = ProjectileUtil.createArrowProjectile(guard, arrow, 2.0f);
+        ArrowEntity projectile = new ArrowEntity(guard.getWorld(), guard, arrow, null);
 
         // Calculate precise aim
         double deltaX = target.getX() - guard.getX();
@@ -322,7 +323,7 @@ public class GuardSpecialAbilities {
         // Fire 3 arrows in a spread
         for (int i = 0; i < 3; i++) {
             ItemStack arrow = new ItemStack(Items.ARROW);
-            PersistentProjectileEntity projectile = ProjectileUtil.createArrowProjectile(guard, arrow, 1.6f);
+            ArrowEntity projectile = new ArrowEntity(guard.getWorld(), guard, arrow, null);
 
             double deltaX = target.getX() - guard.getX();
             double deltaY = target.getBodyY(0.3333333333333333) - projectile.getY();
@@ -348,7 +349,7 @@ public class GuardSpecialAbilities {
 
     private boolean executeSlowingArrow(LivingEntity target) {
         ItemStack arrow = new ItemStack(Items.ARROW);
-        PersistentProjectileEntity projectile = ProjectileUtil.createArrowProjectile(guard, arrow, 1.8f);
+        ArrowEntity projectile = new ArrowEntity(guard.getWorld(), guard, arrow, null);
 
         // Mark arrow for slowness effect (would need projectile impact mixin)
         NbtCompound nbt = new NbtCompound();
@@ -373,7 +374,7 @@ public class GuardSpecialAbilities {
 
     private boolean executeExplosiveShot(LivingEntity target) {
         ItemStack arrow = new ItemStack(Items.ARROW);
-        PersistentProjectileEntity projectile = ProjectileUtil.createArrowProjectile(guard, arrow, 2.2f);
+        ArrowEntity projectile = new ArrowEntity(guard.getWorld(), guard, arrow, null);
 
         // Mark arrow for explosive behavior
         NbtCompound nbt = new NbtCompound();
@@ -398,10 +399,13 @@ public class GuardSpecialAbilities {
 
     private boolean executePiercingShot(LivingEntity target) {
         ItemStack arrow = new ItemStack(Items.ARROW);
-        PersistentProjectileEntity projectile = ProjectileUtil.createArrowProjectile(guard, arrow, 2.5f);
+        ArrowEntity projectile = new ArrowEntity(guard.getWorld(), guard, arrow, null);
 
-        // Set piercing level
-        projectile.setPierceLevel((byte) 3);
+        // Set piercing level via NBT
+        net.minecraft.nbt.NbtCompound nbt = new net.minecraft.nbt.NbtCompound();
+        projectile.writeNbt(nbt);
+        nbt.putByte("piercing", (byte) 3);
+        projectile.readNbt(nbt);
 
         double deltaX = target.getX() - guard.getX();
         double deltaY = target.getBodyY(0.3333333333333333) - projectile.getY();

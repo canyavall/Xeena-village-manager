@@ -70,13 +70,13 @@ public abstract class VillagerEntityMixin extends MerchantEntity {
 
         if (nbt.contains(GUARD_DATA_KEY)) {
             World world = villager.getWorld();
-            if (world instanceof ServerWorld) {
+            if (world instanceof ServerWorld serverWorld) {
                 GuardDataManager manager = GuardDataManager.get(world);
                 GuardData guardData = new GuardData(villager.getUuid());
-                ServerWorld serverWorld = (ServerWorld) world;
                 guardData.deserializeNbt(nbt.getCompound(GUARD_DATA_KEY), serverWorld.getRegistryManager());
 
                 manager.updateGuardData(villager, guardData);
+
                 XeenaaVillagerManager.LOGGER.debug("Loaded guard data from villager NBT: {}",
                     villager.getUuid());
             }

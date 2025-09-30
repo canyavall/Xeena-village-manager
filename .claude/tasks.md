@@ -408,16 +408,28 @@ Phase 2 focuses on implementing active guard AI behaviors to make guards functio
 ## 🔴 CRITICAL - PHASE 2 CORE FEATURES
 
 ### P2-TASK-001: Core Guard AI Goals Implementation
-**Status**: TODO
+**Status**: IN_PROGRESS
 **Priority**: Critical
 **Assignee**: minecraft-developer
 **Estimated Effort**: 6-8 hours
+**Started**: September 29, 2025
 
 **Description**: Implement fundamental AI goals that make guards actively defend villagers and attack hostile mobs. This forms the foundation of all guard combat behavior.
 
+**Progress Update - September 29, 2025**:
+- ✅ **Basic Combat Working**: Guards detect and attack hostile mobs (zombies, skeletons)
+- ✅ **Weapon Equipment**: Guards properly equip rank-appropriate weapons (swords/bows)
+- ✅ **Path Specialization**: Marksman guards correctly get bows, melee guards get swords
+- ✅ **Weapon Rendering**: Guards visually hold their weapons (HeldItemFeatureRenderer)
+- ✅ **Ranged Combat**: Marksman guards shoot arrows and maintain distance from targets
+- ⚠️ **Attack Animations**: Guards attack but animation system needs debugging
+  - Model has attack animation code (handSwingProgress handling)
+  - swingHand() is being called with animation packets
+  - Issue may be with model animation timing or packet synchronization
+
 **Core AI Goals to Implement**:
+- [x] **GuardDirectAttackGoal**: Direct hostile mob targeting and combat (IMPLEMENTED)
 - [ ] **GuardDefendVillagerGoal**: Guards target mobs attacking nearby villagers
-- [ ] **GuardAttackHostilesGoal**: Guards proactively attack nearby hostile mobs
 - [ ] **GuardPatrolGoal**: Guards patrol around their guard post when not in combat
 - [ ] **GuardFollowVillagerGoal**: Guards stay near villagers they're protecting
 

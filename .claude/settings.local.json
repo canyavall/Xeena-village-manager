@@ -24,7 +24,10 @@
       "Bash(del \"C:\\Users\\canya\\Documents\\projects\\Minecraft\\xeena-village-manager\\.claude\\agents\\minecraft-java-engineer.md\")",
       "Bash(java:*)",
       "Bash(chmod:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(.gradlew build)",
+      "Bash(gradlew:*)",
+      "Bash(./gradlew.bat build:*)"
     ],
     "deny": [],
     "ask": []

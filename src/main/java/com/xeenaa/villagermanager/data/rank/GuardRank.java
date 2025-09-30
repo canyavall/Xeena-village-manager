@@ -11,27 +11,27 @@ import net.minecraft.util.StringIdentifiable;
  * Ranks must be purchased sequentially using emeralds.
  *
  * Design Specification:
- * - Melee Path: Tank focus with high HP (35→95), moderate damage
- * - Ranged Path: Glass cannon with low HP (25→45), high damage
+ * - Melee Path: Tank focus with high HP (25→45), moderate damage (6→12)
+ * - Ranged Path: Glass cannon with low HP (20→28), high damage (5→10)
  */
 public enum GuardRank implements StringIdentifiable {
     // Base rank - no cost, automatically assigned
     RECRUIT("recruit", "Recruit", 0, createRecruitStats(), null),
 
-    // Melee specialization path (Tank focus)
-    MAN_AT_ARMS_I("man_at_arms_1", "Man-at-Arms I", 15, RankStats.melee(35.0f, 6.0f), null),
-    MAN_AT_ARMS_II("man_at_arms_2", "Man-at-Arms II", 20, RankStats.melee(50.0f, 8.0f), null),
-    MAN_AT_ARMS_III("man_at_arms_3", "Man-at-Arms III", 45, RankStats.melee(70.0f, 10.0f), null),
-    KNIGHT("knight", "Knight", 75, RankStats.melee(95.0f, 12.0f), new KnockbackAbility()),
+    // Melee specialization path (Tank focus): 25→45 HP, 6→12 damage
+    MAN_AT_ARMS_I("man_at_arms_1", "Man-at-Arms I", 15, RankStats.melee(25.0f, 6.0f), null),
+    MAN_AT_ARMS_II("man_at_arms_2", "Man-at-Arms II", 20, RankStats.melee(30.0f, 8.0f), null),
+    MAN_AT_ARMS_III("man_at_arms_3", "Man-at-Arms III", 45, RankStats.melee(37.0f, 10.0f), null),
+    KNIGHT("knight", "Knight", 75, RankStats.melee(45.0f, 12.0f), new KnockbackAbility()),
 
-    // Ranged specialization path (Glass cannon)
-    MARKSMAN_I("marksman_1", "Marksman I", 15, RankStats.ranged(25.0f, 6.0f, 2.0f), null),
-    MARKSMAN_II("marksman_2", "Marksman II", 20, RankStats.ranged(30.0f, 9.0f, 1.5f), null),
-    MARKSMAN_III("marksman_3", "Marksman III", 45, RankStats.ranged(35.0f, 12.0f, 1.0f), null),
-    SHARPSHOOTER("sharpshooter", "Sharpshooter", 75, RankStats.ranged(45.0f, 16.0f, 0.8f), new PiercingShotAbility());
+    // Ranged specialization path (Glass cannon): 20→28 HP, 5→10 damage
+    MARKSMAN_I("marksman_1", "Marksman I", 15, RankStats.ranged(20.0f, 5.0f, 2.0f), null),
+    MARKSMAN_II("marksman_2", "Marksman II", 20, RankStats.ranged(22.0f, 6.5f, 1.5f), null),
+    MARKSMAN_III("marksman_3", "Marksman III", 45, RankStats.ranged(25.0f, 8.0f, 1.0f), null),
+    SHARPSHOOTER("sharpshooter", "Sharpshooter", 75, RankStats.ranged(28.0f, 10.0f, 0.8f), new PiercingShotAbility());
 
     private static RankStats createRecruitStats() {
-        return RankStats.melee(25.0f, 4.0f);
+        return RankStats.melee(20.0f, 4.0f);
     }
 
     public static final PacketCodec<RegistryByteBuf, GuardRank> CODEC =

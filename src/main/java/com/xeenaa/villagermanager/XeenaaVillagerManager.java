@@ -87,7 +87,7 @@ public class XeenaaVillagerManager implements ModInitializer {
         ThreatEventHandler.initialize();
 
         // Final initialization complete message
-        LOGGER.info("Xeenaa Villager Manager initialization complete - Guard profession with threat detection ready");
+        LOGGER.info("Xeenaa Villager Manager initialization complete - Guard profession ready");
 
         // Note: Villager interaction event registration moved to client-side
     }

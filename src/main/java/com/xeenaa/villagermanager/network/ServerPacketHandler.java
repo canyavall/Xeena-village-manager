@@ -258,11 +258,11 @@ public class ServerPacketHandler {
 
                 // Purchase the rank
                 if (rankData.purchaseRank(targetRank, playerEmeralds)) {
-                    // Apply rank stats to villager
-                    applyRankStats(villager, targetRank);
-
                     // Save guard data
                     guardData.saveToVillager(villager, world.getRegistryManager());
+
+                    // Re-equip weapon based on new rank/path (clear mainhand to trigger immediate re-equipment)
+                    villager.equipStack(net.minecraft.entity.EquipmentSlot.MAINHAND, net.minecraft.item.ItemStack.EMPTY);
 
                     // Send sync packet to all clients
                     GuardRankSyncPacket syncPacket = new GuardRankSyncPacket(
@@ -339,28 +339,6 @@ public class ServerPacketHandler {
         return "Requirements not met";
     }
 
-    /**
-     * Apply rank-based stats to a guard villager
-     */
-    private static void applyRankStats(VillagerEntity villager, GuardRank rank) {
-        RankStats stats = rank.getStats();
-
-        // Apply health
-        EntityAttributeInstance healthAttribute = villager.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH);
-        if (healthAttribute != null) {
-            healthAttribute.setBaseValue(stats.getMaxHealth());
-            villager.setHealth(stats.getMaxHealth()); // Heal to new max health
-        }
-
-        // Apply attack damage
-        EntityAttributeInstance attackAttribute = villager.getAttributeInstance(EntityAttributes.GENERIC_ATTACK_DAMAGE);
-        if (attackAttribute != null) {
-            attackAttribute.setBaseValue(stats.getAttackDamage());
-        }
-
-        XeenaaVillagerManager.LOGGER.debug("Applied rank {} stats to villager {}: HP={}, Attack={}",
-            rank.getDisplayName(), villager.getUuid(), stats.getMaxHealth(), stats.getAttackDamage());
-    }
 
     /**
      * Handle guard profession change warning - sends emerald loss warning to client for confirmation

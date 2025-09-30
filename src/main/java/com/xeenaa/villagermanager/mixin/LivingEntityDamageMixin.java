@@ -6,6 +6,7 @@ import net.minecraft.entity.damage.DamageSource;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
@@ -42,10 +43,10 @@ public class LivingEntityDamageMixin {
      * Intercepts entity death to clean up threat tracking
      *
      * @param source The damage source that caused death
-     * @param cir Callback info returnable for the onDeath method
+     * @param ci Callback info for the onDeath method
      */
     @Inject(method = "onDeath", at = @At("HEAD"))
-    private void onDeath(DamageSource source, CallbackInfoReturnable<Void> cir) {
+    private void onDeath(DamageSource source, CallbackInfo ci) {
         LivingEntity entity = (LivingEntity) (Object) this;
         ThreatEventHandler.handleEntityDeath(entity);
     }

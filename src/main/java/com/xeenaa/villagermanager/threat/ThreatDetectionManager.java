@@ -308,22 +308,21 @@ public class ThreatDetectionManager {
     }
 
     private double calculateDetectionRange(GuardData guardData) {
-        double baseRange = BASE_DETECTION_RANGE;
-
-        // Increase range based on rank
-        int rankLevel = guardData.getRankData().getCurrentRank().ordinal();
-        double rankMultiplier = 1.0 + (rankLevel * 0.2); // +20% per rank level
+        // Use tier-based detection range: 8 + (tier * 2) blocks
+        // Tier 1 = 8 blocks, Tier 2 = 10 blocks, Tier 3 = 12 blocks, Tier 4 = 14 blocks, Tier 5 = 16 blocks
+        int tier = guardData.getRankData().getCurrentTier();
+        double baseRange = 8.0 + (tier * 2.0);
 
         // Role-specific modifications
         switch (guardData.getRole()) {
             case PATROL:
-                return baseRange * rankMultiplier * 1.5; // Patrol guards have extended range
+                return baseRange * 1.25; // Patrol guards have extended range (+25%)
             case GUARD:
-                return baseRange * rankMultiplier;
+                return baseRange;
             case FOLLOW:
-                return baseRange * rankMultiplier * 0.8; // Follow guards focus on close protection
+                return baseRange * 0.9; // Follow guards focus on close protection (-10%)
             default:
-                return baseRange * rankMultiplier;
+                return baseRange;
         }
     }
 

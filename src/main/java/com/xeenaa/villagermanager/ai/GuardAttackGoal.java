@@ -2,6 +2,7 @@ package com.xeenaa.villagermanager.ai;
 
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.data.GuardDataManager;
+import com.xeenaa.villagermanager.data.rank.GuardRank;
 import com.xeenaa.villagermanager.threat.ThreatDetectionManager;
 import com.xeenaa.villagermanager.threat.ThreatInfo;
 import net.minecraft.entity.LivingEntity;
@@ -27,12 +28,7 @@ public class GuardAttackGoal extends ActiveTargetGoal<HostileEntity> {
     public boolean canStart() {
         // Only guards can use this goal
         if (!isGuard()) {
-            return false;
-        }
-
-        // Check if guard data exists
-        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
-        if (guardData == null) {
+            System.out.println("GUARD ATTACK: Not a guard villager");
             return false;
         }
 
@@ -42,17 +38,20 @@ public class GuardAttackGoal extends ActiveTargetGoal<HostileEntity> {
             ThreatInfo threat = threatManager.detectPrimaryThreat(guard);
 
             if (threat != null) {
-                // Check role-specific engagement rules
-                if (shouldEngageThreat(threat, guardData.getRole())) {
-                    this.currentThreat = threat;
-                    this.target = threat.getThreatEntity();
-                    return true;
-                }
+                System.out.println("GUARD ATTACK: Found threat - " + threat.getDescription() + " at distance " + threat.getDistance());
+                this.currentThreat = threat;
+                this.target = threat.getThreatEntity();
+                System.out.println("GUARD ATTACK: Engaging target!");
+                return true;
             }
         }
 
-        // Fall back to parent implementation if no threat system available
-        return super.canStart() && checkRoleConditions(guardData.getRole());
+        // Fall back to parent implementation - simplified to just check for nearby hostiles
+        boolean canStart = super.canStart();
+        if (canStart) {
+            System.out.println("GUARD ATTACK: Parent goal found target - engaging!");
+        }
+        return canStart;
     }
 
     @Override
@@ -76,16 +75,45 @@ public class GuardAttackGoal extends ActiveTargetGoal<HostileEntity> {
     }
 
     private boolean shouldEngageThreat(ThreatInfo threat, GuardData.GuardRole role) {
+        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
+        if (guardData == null) {
+            return false;
+        }
+
+        // Get tier-based detection range: 8 + (tier * 2) blocks
+        int tier = guardData.getRankData().getCurrentTier();
+        double detectionRange = 8.0 + (tier * 2.0);
+        double distance = threat.getDistance();
+
+        // Check specialization-specific targeting preferences
+        boolean isMelee = isMeleeSpecialization(guardData.getRankData());
+        boolean isRanged = isRangedSpecialization(guardData.getRankData());
+
+        // Melee guards prefer closer targets
+        if (isMelee && distance > detectionRange * 0.75) {
+            // Only engage targets beyond 75% of detection range if high priority
+            if (!threat.isHighPriority()) {
+                return false;
+            }
+        }
+
+        // Ranged guards prefer medium-distance targets
+        if (isRanged && distance < 4.0 && !threat.isHighPriority()) {
+            // Avoid engaging very close targets unless high priority
+            return false;
+        }
+
+        // Role-specific engagement rules
         switch (role) {
             case PATROL:
-                // Patrol guards engage all detected threats
-                return true;
+                // Patrol guards engage all detected threats within their detection range
+                return distance <= detectionRange * 1.25; // +25% range for patrol guards
             case GUARD:
                 // Stationary guards engage threats within their area
-                return isNearPost() && threat.getDistance() <= 20.0;
+                return isNearPost() && distance <= detectionRange;
             case FOLLOW:
                 // Follow guards prioritize protecting their assigned player
-                return isNearPlayer() && (threat.isHighPriority() || threat.getDistance() <= 12.0);
+                return isNearPlayer() && (threat.isHighPriority() || distance <= detectionRange * 0.9);
             default:
                 return false;
         }
@@ -105,7 +133,10 @@ public class GuardAttackGoal extends ActiveTargetGoal<HostileEntity> {
     }
 
     private boolean isGuard() {
-        return guard.getVillagerData().getProfession().id().equals("guard");
+        String professionId = guard.getVillagerData().getProfession().id();
+        boolean isGuardProf = professionId.equals("xeenaa_villager_manager:guard") || professionId.equals("guard");
+        System.out.println("GUARD ATTACK: Checking profession - " + professionId + " - isGuard: " + isGuardProf);
+        return isGuardProf;
     }
 
     private boolean isNearPost() {
@@ -117,5 +148,25 @@ public class GuardAttackGoal extends ActiveTargetGoal<HostileEntity> {
     private boolean isNearPlayer() {
         // Check if guard is following a player and within range
         return guard.getWorld().getClosestPlayer(guard, 32) != null;
+    }
+
+    private boolean isMeleeSpecialization(com.xeenaa.villagermanager.data.rank.GuardRankData rankData) {
+        if (rankData.getChosenPath() != null) {
+            return rankData.getChosenPath().getId().equals("man_at_arms");
+        }
+
+        // Check current rank for specialization
+        String rankId = rankData.getCurrentRank().getId();
+        return rankId.startsWith("man_at_arms_") || rankId.equals("recruit");
+    }
+
+    private boolean isRangedSpecialization(com.xeenaa.villagermanager.data.rank.GuardRankData rankData) {
+        if (rankData.getChosenPath() != null) {
+            return rankData.getChosenPath().getId().equals("marksman");
+        }
+
+        // Check current rank for specialization
+        String rankId = rankData.getCurrentRank().getId();
+        return rankId.startsWith("marksman_");
     }
 }

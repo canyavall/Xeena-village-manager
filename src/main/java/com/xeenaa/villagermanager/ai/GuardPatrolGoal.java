@@ -9,6 +9,8 @@ import net.minecraft.util.math.Vec3d;
 
 import java.util.EnumSet;
 import java.util.Random;
+import java.util.Optional;
+import java.util.List;
 
 /**
  * AI goal that makes guards patrol around their assigned area when not in combat.
@@ -64,14 +66,20 @@ public class GuardPatrolGoal extends Goal {
             return false;
         }
 
-        // Set patrol center if not set
+        // Set patrol center to guard post workstation if available
         if (patrolCenter == null) {
-            patrolCenter = guard.getBlockPos();
+            BlockPos workstation = findGuardPostWorkstation();
+            if (workstation != null) {
+                patrolCenter = workstation;
+            } else {
+                // Fallback to current position if no workstation found
+                patrolCenter = guard.getBlockPos();
+            }
         }
 
         // Check if we need to find a new patrol target
         if (currentTarget == null || hasReachedTarget() || patrolTicks > MAX_PATROL_TIME) {
-            currentTarget = findPatrolTarget();
+            currentTarget = findBasicPatrolTarget();
             patrolTicks = 0;
         }
 
@@ -109,7 +117,7 @@ public class GuardPatrolGoal extends Goal {
         // Check if navigation failed
         if (!guard.getNavigation().isFollowingPath() && currentTarget != null) {
             // Try to find a new target if navigation failed
-            currentTarget = findPatrolTarget();
+            currentTarget = findBasicPatrolTarget();
             if (currentTarget != null) {
                 guard.getNavigation().startMovingTo(currentTarget.getX(), currentTarget.getY(), currentTarget.getZ(), 0.5);
             }
@@ -125,9 +133,9 @@ public class GuardPatrolGoal extends Goal {
     }
 
     /**
-     * Finds a suitable patrol target within the patrol radius
+     * Finds a basic patrol target
      */
-    private BlockPos findPatrolTarget() {
+    private BlockPos findBasicPatrolTarget() {
         if (patrolCenter == null) {
             patrolCenter = guard.getBlockPos();
         }
@@ -219,6 +227,13 @@ public class GuardPatrolGoal extends Goal {
     }
 
     /**
+     * Checks if another villager is a guard
+     */
+    private boolean isGuard(VillagerEntity villager) {
+        return villager.getVillagerData().getProfession().id().equals("guard");
+    }
+
+    /**
      * Sets the patrol center for this guard
      */
     public void setPatrolCenter(BlockPos center) {
@@ -230,5 +245,48 @@ public class GuardPatrolGoal extends Goal {
      */
     public void setPatrolRadius(int radius) {
         this.patrolRadius = Math.max(4, Math.min(32, radius)); // Clamp between 4 and 32 blocks
+    }
+
+    /**
+     * Finds the guard post workstation for this guard
+     */
+    private BlockPos findGuardPostWorkstation() {
+        // Check if guard has a job site (workstation)
+        Optional<net.minecraft.util.math.GlobalPos> jobSite = guard.getBrain().getOptionalMemory(net.minecraft.entity.ai.brain.MemoryModuleType.JOB_SITE);
+        if (jobSite.isPresent()) {
+            net.minecraft.util.math.GlobalPos globalPos = jobSite.get();
+            // Check if job site is in the current dimension
+            if (globalPos.dimension().equals(guard.getWorld().getRegistryKey())) {
+                BlockPos pos = globalPos.pos();
+                // Verify it's actually a guard post
+                if (guard.getWorld().getBlockState(pos).getBlock() instanceof com.xeenaa.villagermanager.block.GuardPostBlock) {
+                    return pos;
+                }
+            }
+        }
+
+        // If no job site in memory, search for nearby guard posts
+        return findNearbyGuardPost();
+    }
+
+    /**
+     * Searches for a guard post within a reasonable range
+     */
+    private BlockPos findNearbyGuardPost() {
+        BlockPos guardPos = guard.getBlockPos();
+        int searchRadius = 48; // Search within 48 blocks
+
+        for (int x = -searchRadius; x <= searchRadius; x++) {
+            for (int y = -searchRadius/2; y <= searchRadius/2; y++) {
+                for (int z = -searchRadius; z <= searchRadius; z++) {
+                    BlockPos checkPos = guardPos.add(x, y, z);
+                    if (guard.getWorld().getBlockState(checkPos).getBlock() instanceof com.xeenaa.villagermanager.block.GuardPostBlock) {
+                        return checkPos;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 }

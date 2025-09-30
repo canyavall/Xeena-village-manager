@@ -3,12 +3,14 @@ package com.xeenaa.villagermanager.ai;
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.data.GuardDataManager;
 import com.xeenaa.villagermanager.data.rank.GuardRankData;
+import com.xeenaa.villagermanager.ai.GuardSpecialAbilities;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.RangedAttackMob;
-import net.minecraft.entity.ai.goal.BowAttackGoal;
+import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
-import net.minecraft.entity.projectile.ProjectileUtil;
+import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.BowItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -17,17 +19,19 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import java.util.EnumSet;
+import java.util.Optional;
 
 /**
  * Ranged attack goal for guard villagers with specialized behavior patterns.
  * Implements glass cannon specialization with distance maintenance and kiting tactics.
  */
-public class GuardRangedAttackGoal extends BowAttackGoal<VillagerEntity> {
+public class GuardRangedAttackGoal extends Goal {
     private final VillagerEntity guard;
     private int attackCooldown = 0;
     private int repositionCooldown = 0;
-    private int specialAbilityCooldown = 0;
     private BlockPos lastHighGroundPos = null;
+    private GuardSpecialAbilities specialAbilities;
 
     // Distance management constants
     private static final double PREFERRED_MIN_DISTANCE = 8.0;
@@ -35,15 +39,23 @@ public class GuardRangedAttackGoal extends BowAttackGoal<VillagerEntity> {
     private static final double DANGER_DISTANCE = 5.0;
     private static final double HIGH_GROUND_SEARCH_RADIUS = 10.0;
 
-    // Ability cooldowns (in ticks)
+    // Cooldowns (in ticks)
     private static final int BASE_ATTACK_COOLDOWN = 30; // 1.5 seconds
     private static final int REPOSITION_COOLDOWN = 60; // 3 seconds
-    private static final int MULTISHOT_COOLDOWN = 200; // 10 seconds
-    private static final int EXPLOSIVE_SHOT_COOLDOWN = 300; // 15 seconds
+
+    private final double moveSpeed;
+    private final int attackInterval;
+    private final float maxShootRange;
+    private int attackTime = -1;
+    private int seeTime;
 
     public GuardRangedAttackGoal(VillagerEntity guard, double speed, int attackInterval, float maxShootRange) {
-        super(guard, speed, attackInterval, maxShootRange);
         this.guard = guard;
+        this.moveSpeed = speed;
+        this.attackInterval = attackInterval;
+        this.maxShootRange = maxShootRange;
+        this.specialAbilities = GuardSpecialAbilities.get(guard);
+        this.setControls(EnumSet.of(Goal.Control.MOVE, Goal.Control.LOOK));
     }
 
     @Override
@@ -63,7 +75,32 @@ public class GuardRangedAttackGoal extends BowAttackGoal<VillagerEntity> {
             return false;
         }
 
-        return super.canStart();
+        // Check if guard has bow and arrows
+        ItemStack mainHand = guard.getEquippedStack(net.minecraft.entity.EquipmentSlot.MAINHAND);
+        if (!(mainHand.getItem() instanceof BowItem)) {
+            return false;
+        }
+
+        LivingEntity target = guard.getTarget();
+        return target != null && target.isAlive();
+    }
+
+    @Override
+    public boolean shouldContinue() {
+        return this.canStart() || !guard.getNavigation().isIdle();
+    }
+
+    @Override
+    public void start() {
+        super.start();
+    }
+
+    @Override
+    public void stop() {
+        super.stop();
+        lastHighGroundPos = null;
+        attackTime = -1;
+        seeTime = 0;
     }
 
     @Override
@@ -76,35 +113,50 @@ public class GuardRangedAttackGoal extends BowAttackGoal<VillagerEntity> {
         // Update cooldowns
         if (attackCooldown > 0) attackCooldown--;
         if (repositionCooldown > 0) repositionCooldown--;
-        if (specialAbilityCooldown > 0) specialAbilityCooldown--;
 
         double distanceToTarget = guard.squaredDistanceTo(target);
         double actualDistance = Math.sqrt(distanceToTarget);
+        boolean canSeeTarget = guard.getVisibilityCache().canSee(target);
 
-        // Handle positioning and movement
-        handleRangedPositioning(target, actualDistance);
+        if (canSeeTarget) {
+            ++this.seeTime;
+        } else {
+            this.seeTime = 0;
+        }
+
+        // Handle basic ranged positioning
+        handleBasicRangedPositioning(target, actualDistance);
 
         // Handle attacking
-        if (canAttack(actualDistance)) {
+        if (canSeeTarget && canAttack(actualDistance)) {
             performRangedAttack(target, actualDistance);
+            this.attackTime = this.attackInterval;
+        }
+
+        if (this.attackTime > 0) {
+            --this.attackTime;
         }
     }
 
     /**
-     * Handles positioning logic for ranged combat specialization
+     * Handles basic ranged positioning
      */
-    private void handleRangedPositioning(LivingEntity target, double distance) {
+    private void handleBasicRangedPositioning(LivingEntity target, double distance) {
         // Emergency retreat if too close
         if (distance <= DANGER_DISTANCE) {
             performEmergencyRetreat(target);
             return;
         }
 
+        // Only reposition if cooldown is finished
+        if (repositionCooldown > 0) {
+            return;
+        }
         // Seek high ground if available and not in danger
         if (repositionCooldown <= 0 && distance > DANGER_DISTANCE) {
             BlockPos highGround = findHighGround(target);
             if (highGround != null && !highGround.equals(lastHighGroundPos)) {
-                guard.getNavigation().startMovingTo(highGround.getX(), highGround.getY(), highGround.getZ(), 1.0);
+                guard.getNavigation().startMovingTo(highGround.getX(), highGround.getY(), highGround.getZ(), moveSpeed);
                 lastHighGroundPos = highGround;
                 repositionCooldown = REPOSITION_COOLDOWN;
                 return;
@@ -122,7 +174,7 @@ public class GuardRangedAttackGoal extends BowAttackGoal<VillagerEntity> {
             Vec3d direction = targetPos.subtract(guardPos).normalize();
             Vec3d moveTarget = targetPos.subtract(direction.multiply(PREFERRED_MIN_DISTANCE + 2.0));
 
-            guard.getNavigation().startMovingTo(moveTarget.x, moveTarget.y, moveTarget.z, 0.8);
+            guard.getNavigation().startMovingTo(moveTarget.x, moveTarget.y, moveTarget.z, moveSpeed * 0.8);
         }
     }
 
@@ -135,7 +187,7 @@ public class GuardRangedAttackGoal extends BowAttackGoal<VillagerEntity> {
         Vec3d retreatDirection = guardPos.subtract(targetPos).normalize();
         Vec3d retreatTarget = guardPos.add(retreatDirection.multiply(8.0));
 
-        guard.getNavigation().startMovingTo(retreatTarget.x, retreatTarget.y, retreatTarget.z, 1.2);
+        guard.getNavigation().startMovingTo(retreatTarget.x, retreatTarget.y, retreatTarget.z, moveSpeed * 1.2);
         repositionCooldown = REPOSITION_COOLDOWN / 2; // Shorter cooldown for emergency moves
     }
 
@@ -156,7 +208,7 @@ public class GuardRangedAttackGoal extends BowAttackGoal<VillagerEntity> {
         }
 
         Vec3d kiteTarget = guardPos.add(kiteDirection.multiply(6.0)).add(perpendicular.multiply(2.0));
-        guard.getNavigation().startMovingTo(kiteTarget.x, kiteTarget.y, kiteTarget.z, 1.0);
+        guard.getNavigation().startMovingTo(kiteTarget.x, kiteTarget.y, kiteTarget.z, moveSpeed);
 
         repositionCooldown = REPOSITION_COOLDOWN;
     }
@@ -234,14 +286,32 @@ public class GuardRangedAttackGoal extends BowAttackGoal<VillagerEntity> {
         GuardRankData rankData = guardData.getRankData();
         int tier = rankData.getCurrentTier();
 
-        // Special abilities based on rank
-        if (tier >= 5 && specialAbilityCooldown <= 0 && guard.getRandom().nextFloat() < 0.3f) {
-            performExplosiveShot(target);
-            specialAbilityCooldown = EXPLOSIVE_SHOT_COOLDOWN;
-        } else if (tier >= 4 && specialAbilityCooldown <= 0 && guard.getRandom().nextFloat() < 0.4f) {
-            performMultishot(target);
-            specialAbilityCooldown = MULTISHOT_COOLDOWN;
-        } else {
+        // Try to use special abilities based on rank
+        boolean usedSpecialAttack = false;
+
+        if (tier >= 5) {
+            float random = guard.getRandom().nextFloat();
+            if (random < 0.2f) {
+                usedSpecialAttack = specialAbilities.useAbility(GuardSpecialAbilities.AbilityType.EXPLOSIVE_SHOT, target);
+            } else if (random < 0.35f) {
+                usedSpecialAttack = specialAbilities.useAbility(GuardSpecialAbilities.AbilityType.PIERCING_SHOT, target);
+            }
+        }
+
+        if (!usedSpecialAttack && tier >= 4) {
+            float random = guard.getRandom().nextFloat();
+            if (random < 0.3f) {
+                usedSpecialAttack = specialAbilities.useAbility(GuardSpecialAbilities.AbilityType.MULTISHOT, target);
+            } else if (random < 0.5f) {
+                usedSpecialAttack = specialAbilities.useAbility(GuardSpecialAbilities.AbilityType.SLOWING_ARROW, target);
+            }
+        }
+
+        if (!usedSpecialAttack && tier >= 3 && guard.getRandom().nextFloat() < 0.4f) {
+            usedSpecialAttack = specialAbilities.useAbility(GuardSpecialAbilities.AbilityType.PRECISION_SHOT, target);
+        }
+
+        if (!usedSpecialAttack) {
             performBasicRangedAttack(target, tier);
         }
 
@@ -252,88 +322,26 @@ public class GuardRangedAttackGoal extends BowAttackGoal<VillagerEntity> {
      * Performs basic ranged attack with accuracy based on tier
      */
     private void performBasicRangedAttack(LivingEntity target, int tier) {
-        ItemStack bow = new ItemStack(Items.BOW);
-        ItemStack arrow = new ItemStack(Items.ARROW);
+        // Create arrow entity
+        ArrowEntity arrow = new ArrowEntity(guard.getWorld(), guard, new ItemStack(Items.ARROW), null);
 
         // Improved accuracy for higher tiers
-        float accuracy = 1.0f + (tier * 0.2f);
+        float accuracy = Math.max(1.0f, 14 - tier * 2);
         float velocity = 1.6f;
 
         guard.swingHand(Hand.MAIN_HAND);
 
-        PersistentProjectileEntity projectile = ProjectileUtil.createArrowProjectile(guard, arrow, velocity);
-
         // Calculate aim with accuracy bonus
         double deltaX = target.getX() - guard.getX();
-        double deltaY = target.getBodyY(0.3333333333333333) - projectile.getY();
+        double deltaY = target.getBodyY(0.3333333333333333) - arrow.getY();
         double deltaZ = target.getZ() - guard.getZ();
         double horizontalDistance = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
 
-        projectile.setVelocity(deltaX, deltaY + horizontalDistance * 0.20000000298023224, deltaZ, velocity, (14 - tier * 2));
+        arrow.setVelocity(deltaX, deltaY + horizontalDistance * 0.20000000298023224, deltaZ, velocity, accuracy);
 
-        // Add slowing effect for tier 4+
-        if (tier >= 4) {
-            // Arrow will apply slowness effect on hit (handled in projectile impact)
-        }
-
-        guard.getWorld().spawnEntity(projectile);
+        guard.getWorld().spawnEntity(arrow);
         guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
             SoundEvents.ENTITY_ARROW_SHOOT, guard.getSoundCategory(), 1.0f, 1.0f);
-    }
-
-    /**
-     * Performs multishot ability (tier 4+)
-     */
-    private void performMultishot(LivingEntity target) {
-        guard.swingHand(Hand.MAIN_HAND);
-
-        // Fire 3 arrows in a spread
-        for (int i = 0; i < 3; i++) {
-            ItemStack arrow = new ItemStack(Items.ARROW);
-            PersistentProjectileEntity projectile = ProjectileUtil.createArrowProjectile(guard, arrow, 1.6f);
-
-            double deltaX = target.getX() - guard.getX();
-            double deltaY = target.getBodyY(0.3333333333333333) - projectile.getY();
-            double deltaZ = target.getZ() - guard.getZ();
-            double horizontalDistance = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
-
-            // Add spread to the arrows
-            double spreadAngle = (i - 1) * 0.2; // -0.2, 0, 0.2 radians
-            double cos = Math.cos(spreadAngle);
-            double sin = Math.sin(spreadAngle);
-            double newDeltaX = deltaX * cos - deltaZ * sin;
-            double newDeltaZ = deltaX * sin + deltaZ * cos;
-
-            projectile.setVelocity(newDeltaX, deltaY + horizontalDistance * 0.20000000298023224, newDeltaZ, 1.6f, 12);
-            guard.getWorld().spawnEntity(projectile);
-        }
-
-        guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
-            SoundEvents.ENTITY_ARROW_SHOOT, guard.getSoundCategory(), 1.0f, 0.8f);
-    }
-
-    /**
-     * Performs explosive shot ability (tier 5)
-     */
-    private void performExplosiveShot(LivingEntity target) {
-        guard.swingHand(Hand.MAIN_HAND);
-
-        ItemStack arrow = new ItemStack(Items.ARROW);
-        PersistentProjectileEntity projectile = ProjectileUtil.createArrowProjectile(guard, arrow, 2.0f);
-
-        // Tag the arrow for explosive behavior (handled in projectile impact mixin)
-        projectile.getDataTracker().set(projectile.getDataTracker().get(projectile.PIERCING_LEVEL), 999); // Special marker
-
-        double deltaX = target.getX() - guard.getX();
-        double deltaY = target.getBodyY(0.3333333333333333) - projectile.getY();
-        double deltaZ = target.getZ() - guard.getZ();
-        double horizontalDistance = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
-
-        projectile.setVelocity(deltaX, deltaY + horizontalDistance * 0.20000000298023224, deltaZ, 2.0f, 8);
-        guard.getWorld().spawnEntity(projectile);
-
-        guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
-            SoundEvents.ENTITY_FIREWORK_ROCKET_LAUNCH, guard.getSoundCategory(), 1.0f, 1.2f);
     }
 
     /**
@@ -358,11 +366,5 @@ public class GuardRangedAttackGoal extends BowAttackGoal<VillagerEntity> {
 
     private boolean isGuard() {
         return guard.getVillagerData().getProfession().id().equals("guard");
-    }
-
-    @Override
-    public void stop() {
-        super.stop();
-        lastHighGroundPos = null;
     }
 }

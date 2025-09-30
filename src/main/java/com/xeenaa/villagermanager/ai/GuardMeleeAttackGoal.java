@@ -19,6 +19,7 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Melee attack goal for guard villagers with tank specialization behaviors.
@@ -27,10 +28,6 @@ import java.util.List;
 public class GuardMeleeAttackGoal extends MeleeAttackGoal {
     private final VillagerEntity guard;
     private int attackCooldown = 0;
-    private int specialAbilityCooldown = 0;
-    private int tauntCooldown = 0;
-    private boolean isBlocking = false;
-    private int blockingDuration = 0;
 
     // Combat constants
     private static final double PREFERRED_COMBAT_RANGE = 3.0;
@@ -73,29 +70,25 @@ public class GuardMeleeAttackGoal extends MeleeAttackGoal {
 
         // Update cooldowns
         if (attackCooldown > 0) attackCooldown--;
-        if (specialAbilityCooldown > 0) specialAbilityCooldown--;
-        if (tauntCooldown > 0) tauntCooldown--;
-        if (blockingDuration > 0) {
-            blockingDuration--;
-            if (blockingDuration <= 0) {
-                isBlocking = false;
-            }
-        }
 
+        // Look at target
+        guard.getLookControl().lookAt(target, 30.0f, 30.0f);
+
+        // Calculate distance to target
         double distanceToTarget = guard.squaredDistanceTo(target);
         double actualDistance = Math.sqrt(distanceToTarget);
 
-        // Handle tank positioning and combat
-        handleTankPositioning(target, actualDistance);
-        handleShieldMechanics(target, actualDistance);
-        handleSpecialAbilities(target, actualDistance);
+        // Move toward target if not in melee range
+        if (actualDistance > 3.0) {
+            guard.getNavigation().startMovingTo(target, 1.0);
+        }
 
         super.tick();
     }
 
     @Override
     protected void attack(LivingEntity target) {
-        if (attackCooldown > 0 || isBlocking) {
+        if (attackCooldown > 0) {
             return;
         }
 
@@ -107,13 +100,8 @@ public class GuardMeleeAttackGoal extends MeleeAttackGoal {
         GuardRankData rankData = guardData.getRankData();
         int tier = rankData.getCurrentTier();
 
-        // Check for special attacks
-        if (tier >= 5 && specialAbilityCooldown <= 0 && guard.getRandom().nextFloat() < 0.4f) {
-            performSweepAttack(target, tier);
-            specialAbilityCooldown = SWEEP_ATTACK_COOLDOWN;
-        } else {
-            performBasicMeleeAttack(target, tier);
-        }
+        // Perform enhanced melee attack
+        performBasicMeleeAttackGuard(target, tier);
 
         // Set attack cooldown based on tier
         attackCooldown = getAttackCooldown(tier);
@@ -121,14 +109,15 @@ public class GuardMeleeAttackGoal extends MeleeAttackGoal {
 
 
     private boolean isGuard() {
-        return guard.getVillagerData().getProfession().id().equals("guard");
+        String professionId = guard.getVillagerData().getProfession().id();
+        return professionId.equals("xeenaa_villager_manager:guard") || professionId.equals("guard");
     }
 
 
     /**
-     * Handles aggressive tank positioning for melee combat
+     * Handles basic melee positioning
      */
-    private void handleTankPositioning(LivingEntity target, double distance) {
+    private void handleBasicMeleePositioning(LivingEntity target, double distance) {
         // Aggressive positioning - move directly toward enemy
         if (distance > PREFERRED_COMBAT_RANGE) {
             // Close the distance aggressively
@@ -145,49 +134,25 @@ public class GuardMeleeAttackGoal extends MeleeAttackGoal {
     }
 
     /**
-     * Handles shield blocking mechanics for higher tier guards
-     */
-    private void handleShieldMechanics(LivingEntity target, double distance) {
-        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
-        if (guardData == null) return;
-
-        GuardRankData rankData = guardData.getRankData();
-        int tier = rankData.getCurrentTier();
-
-        // Shield blocking available at tier 4+
-        if (tier >= 4 && !isBlocking && distance <= 4.0) {
-            // Start blocking if enemy is about to attack (simplified logic)
-            if (target.handSwinging && guard.getRandom().nextFloat() < 0.6f) {
-                startBlocking();
-            }
-        }
-    }
-
-    /**
-     * Handles special abilities based on rank
-     */
-    private void handleSpecialAbilities(LivingEntity target, double distance) {
-        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
-        if (guardData == null) return;
-
-        GuardRankData rankData = guardData.getRankData();
-        int tier = rankData.getCurrentTier();
-
-        // Taunt ability at tier 5
-        if (tier >= 5 && tauntCooldown <= 0 && distance <= 8.0) {
-            if (guard.getRandom().nextFloat() < 0.2f) {
-                performTaunt();
-                tauntCooldown = TAUNT_COOLDOWN;
-            }
-        }
-    }
-
-    /**
      * Performs basic melee attack with tier-based enhancements
      */
-    private void performBasicMeleeAttack(LivingEntity target, int tier) {
+    private void performBasicMeleeAttackGuard(LivingEntity target, int tier) {
         // Base damage from entity attributes (includes rank-based scaling)
         float baseDamage = (float) guard.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
+
+        // Add weapon damage if equipped
+        ItemStack weapon = guard.getEquippedStack(net.minecraft.entity.EquipmentSlot.MAINHAND);
+        if (weapon.getItem() instanceof SwordItem || weapon.getItem() instanceof ToolItem) {
+            // Get attack damage from weapon attributes
+            double weaponDamage = weapon.getOrDefault(
+                net.minecraft.component.DataComponentTypes.ATTRIBUTE_MODIFIERS,
+                net.minecraft.component.type.AttributeModifiersComponent.DEFAULT
+            ).modifiers().stream()
+                .filter(entry -> entry.attribute().equals(EntityAttributes.GENERIC_ATTACK_DAMAGE))
+                .mapToDouble(entry -> entry.modifier().value())
+                .sum();
+            baseDamage += (float) weaponDamage;
+        }
 
         // Tier 3+ gets area damage bonus
         if (tier >= 3) {
@@ -219,33 +184,25 @@ public class GuardMeleeAttackGoal extends MeleeAttackGoal {
         }
     }
 
+
     /**
-     * Performs sweep attack (tier 5 special ability)
+     * Gets attack cooldown based on tier
      */
-    private void performSweepAttack(LivingEntity target, int tier) {
-        float baseDamage = (float) guard.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
-        float sweepDamage = baseDamage * 1.5f; // 50% more damage for sweep
+    private int getAttackCooldown(int tier) {
+        return Math.max(15, 25 - (tier * 2)); // Faster attacks at higher tiers
+    }
 
-        // Show enhanced attack animation
-        guard.swingHand(Hand.MAIN_HAND);
+    /**
+     * Checks if the guard uses melee specialization
+     */
+    private boolean isMeleeSpecialization(GuardRankData rankData) {
+        if (rankData.getChosenPath() != null) {
+            return rankData.getChosenPath().getId().equals("man_at_arms");
+        }
 
-        // Deal damage to primary target
-        DamageSource damageSource = guard.getDamageSources().mobAttack(guard);
-        target.damage(damageSource, sweepDamage);
-
-        // Apply strong knockback to primary target
-        target.takeKnockback(1.5,
-            guard.getX() - target.getX(),
-            guard.getZ() - target.getZ());
-
-        // Damage all nearby enemies
-        damageNearbyEnemies(target, AREA_DAMAGE_RADIUS, sweepDamage * 0.8f);
-
-        // Enhanced visual and audio effects
-        guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
-            SoundEvents.ENTITY_PLAYER_ATTACK_SWEEP, guard.getSoundCategory(), 1.0f, 0.8f);
-        guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
-            SoundEvents.ENTITY_PLAYER_ATTACK_STRONG, guard.getSoundCategory(), 0.8f, 1.2f);
+        // Check current rank for specialization
+        String rankId = rankData.getCurrentRank().getId();
+        return rankId.startsWith("man_at_arms_") || rankId.equals("recruit");
     }
 
     /**
@@ -271,69 +228,8 @@ public class GuardMeleeAttackGoal extends MeleeAttackGoal {
         }
     }
 
-    /**
-     * Starts blocking stance
-     */
-    private void startBlocking() {
-        isBlocking = true;
-        blockingDuration = BLOCKING_DURATION;
-
-        // Apply temporary resistance effect
-        guard.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, BLOCKING_DURATION, 1));
-
-        // Play shield sound
-        guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
-            SoundEvents.ITEM_SHIELD_BLOCK, guard.getSoundCategory(), 1.0f, 1.0f);
-    }
-
-    /**
-     * Performs taunt ability to draw enemy attention
-     */
-    private void performTaunt() {
-        // Find nearby enemies and force them to target this guard
-        Box searchBox = Box.of(guard.getPos(), 16, 8, 16);
-        List<LivingEntity> nearbyEnemies = guard.getWorld().getEntitiesByClass(
-            LivingEntity.class, searchBox,
-            entity -> entity != guard && guard.canTarget(entity) && entity.isAlive());
-
-        for (LivingEntity enemy : nearbyEnemies) {
-            if (guard.squaredDistanceTo(enemy) <= 64) { // 8 block radius
-                // Force enemy to target this guard (simplified - would need proper AI goal manipulation)
-                if (enemy instanceof net.minecraft.entity.mob.MobEntity mobEntity) {
-                    mobEntity.setTarget(guard);
-                }
-            }
-        }
-
-        // Visual and audio feedback
-        guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
-            SoundEvents.ENTITY_VILLAGER_CELEBRATE, guard.getSoundCategory(), 1.0f, 0.8f);
-    }
-
-    /**
-     * Gets attack cooldown based on tier
-     */
-    private int getAttackCooldown(int tier) {
-        return Math.max(15, 25 - (tier * 2)); // Faster attacks at higher tiers
-    }
-
-    /**
-     * Checks if the guard uses melee specialization
-     */
-    private boolean isMeleeSpecialization(GuardRankData rankData) {
-        if (rankData.getChosenPath() != null) {
-            return rankData.getChosenPath().getId().equals("man_at_arms");
-        }
-
-        // Check current rank for specialization
-        String rankId = rankData.getCurrentRank().getId();
-        return rankId.startsWith("man_at_arms_") || rankId.equals("recruit");
-    }
-
     @Override
     public void stop() {
         super.stop();
-        isBlocking = false;
-        blockingDuration = 0;
     }
 }
