@@ -47,11 +47,6 @@ public class GuardPatrolGoal extends Goal {
 
     @Override
     public boolean canStart() {
-        // Only guards can patrol
-        if (!isGuard()) {
-            return false;
-        }
-
         // Don't patrol if in combat or has a target
         if (guard.getTarget() != null) {
             return false;
@@ -63,6 +58,7 @@ public class GuardPatrolGoal extends Goal {
             return false;
         }
 
+        // Check if this villager has guard data (better check than profession)
         GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
         if (guardData == null) {
             return false;
@@ -122,6 +118,12 @@ public class GuardPatrolGoal extends Goal {
     public boolean shouldContinue() {
         // Stop if in combat
         if (guard.getTarget() != null) {
+            return false;
+        }
+
+        // Stop if guard mode changed (important for mode switching)
+        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
+        if (guardData == null || guardData.getBehaviorConfig().guardMode() != GuardMode.PATROL) {
             return false;
         }
 
@@ -251,19 +253,6 @@ public class GuardPatrolGoal extends Goal {
         return distance < 4.0; // Within 2 blocks
     }
 
-    /**
-     * Checks if this villager is a guard
-     */
-    private boolean isGuard() {
-        return guard.getVillagerData().getProfession().id().equals("guard");
-    }
-
-    /**
-     * Checks if another villager is a guard
-     */
-    private boolean isGuard(VillagerEntity villager) {
-        return villager.getVillagerData().getProfession().id().equals("guard");
-    }
 
     /**
      * Sets the patrol center for this guard

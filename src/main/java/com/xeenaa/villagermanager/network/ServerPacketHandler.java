@@ -633,8 +633,8 @@ public class ServerPacketHandler {
                 // Save guard data
                 guardData.saveToVillager(villager, world.getRegistryManager());
 
-                // Re-initialize AI goals to apply new configuration
-                villager.reinitializeBrain(world);
+                // NOTE: No need to reinitialize brain - AI goals check guardData.getBehaviorConfig() every tick
+                // villager.reinitializeBrain(world); // REMOVED: This destroys guard AI goals!
 
                 // Send sync packet to all clients
                 GuardConfigSyncPacket syncPacket = new GuardConfigSyncPacket(

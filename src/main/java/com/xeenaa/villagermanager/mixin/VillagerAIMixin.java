@@ -164,6 +164,10 @@ public abstract class VillagerAIMixin extends MerchantEntity implements com.xeen
         this.goalSelector.add(7, new GuardPatrolGoal(self));
         System.out.println("GUARD AI: Added GuardPatrolGoal");
 
+        // Priority 8: STAND mode - prevent all movement (lowest priority so FOLLOW/PATROL can override)
+        this.goalSelector.add(8, new com.xeenaa.villagermanager.ai.GuardStandGoal(self));
+        System.out.println("GUARD AI: Added GuardStandGoal");
+
         System.out.println("GUARD AI: Initialization complete for " + self.getUuid());
     }
 
@@ -176,7 +180,8 @@ public abstract class VillagerAIMixin extends MerchantEntity implements com.xeen
             goal.getGoal() instanceof GuardRangedAttackGoal ||
             goal.getGoal() instanceof GuardFollowVillagerGoal ||
             goal.getGoal() instanceof GuardPatrolGoal ||
-            goal.getGoal() instanceof com.xeenaa.villagermanager.ai.GuardRetreatGoal
+            goal.getGoal() instanceof com.xeenaa.villagermanager.ai.GuardRetreatGoal ||
+            goal.getGoal() instanceof com.xeenaa.villagermanager.ai.GuardStandGoal
         );
 
         this.targetSelector.getGoals().removeIf(goal ->
@@ -300,6 +305,48 @@ public abstract class VillagerAIMixin extends MerchantEntity implements com.xeen
         EntityAttributeInstance attackAttribute = this.getAttributeInstance(EntityAttributes.GENERIC_ATTACK_DAMAGE);
         if (attackAttribute != null) {
             attackAttribute.setBaseValue(1.0);
+        }
+    }
+
+    /**
+     * Skip villager Brain AI for guards, use GoalSelector instead.
+     * Cancels VillagerEntity.mobTick() but still needs MobEntity.mobTick() for movement.
+     */
+    @Inject(method = "mobTick", at = @At("HEAD"), cancellable = true)
+    private void guardMobTick(CallbackInfo ci) {
+        VillagerEntity self = (VillagerEntity) (Object) this;
+
+        // Only for guards on server side
+        if (!this.getWorld().isClient() &&
+            this.getVillagerData().getProfession() == ModProfessions.GUARD &&
+            guardGoalsInitialized) {
+
+            // Debug: Log goal selector tick every 100 ticks (5 seconds)
+            if (self.age % 100 == 0) {
+                System.out.println("GUARD MOB TICK: Ticking goal selector for guard " + self.getUuid());
+                System.out.println("GUARD MOB TICK: Goal count: " + this.goalSelector.getGoals().size());
+                // Print each goal and its status
+                this.goalSelector.getGoals().forEach(goal -> {
+                    System.out.println("GUARD MOB TICK: - " + goal.getGoal().getClass().getSimpleName() +
+                        " (priority: " + goal.getPriority() + ", running: " + goal.isRunning() + ")");
+                });
+            }
+
+            // Call parent MobEntity.mobTick() for basic mob functionality (movement, AI tick)
+            // This skips VillagerEntity's Brain-based logic
+            super.mobTick();
+
+            // Manually tick goal selector (replaces Brain AI)
+            this.getWorld().getProfiler().push("guardGoalSelector");
+            this.goalSelector.tick();
+            this.getWorld().getProfiler().pop();
+
+            this.getWorld().getProfiler().push("guardTargetSelector");
+            this.targetSelector.tick();
+            this.getWorld().getProfiler().pop();
+
+            // Cancel VillagerEntity.mobTick() (Brain AI)
+            ci.cancel();
         }
     }
 

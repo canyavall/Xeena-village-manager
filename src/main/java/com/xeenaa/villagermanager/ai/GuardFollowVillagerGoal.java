@@ -40,29 +40,31 @@ public class GuardFollowVillagerGoal extends Goal {
 
     @Override
     public boolean canStart() {
-        // Only guards can use this goal
-        if (!isGuard()) {
-            return false;
-        }
+        System.out.println("GUARD FOLLOW: canStart() called for guard " + guard.getUuid());
 
         // Don't follow if in combat
         if (guard.getTarget() != null) {
+            System.out.println("GUARD FOLLOW: In combat, skipping");
             return false;
         }
 
+        // Check if this villager has guard data (better check than profession)
         GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
         if (guardData == null) {
+            System.out.println("GUARD FOLLOW: No guard data for " + guard.getUuid() + " - not a guard");
             return false;
         }
 
         // Check if guard mode is FOLLOW
         GuardMode guardMode = guardData.getBehaviorConfig().guardMode();
+        System.out.println("GUARD FOLLOW: Guard " + guard.getUuid() + " mode is " + guardMode);
         if (guardMode != GuardMode.FOLLOW) {
             return false;
         }
 
         // Find someone to follow (prioritize follow target player if set)
         followTarget = findFollowTarget(guardData);
+        System.out.println("GUARD FOLLOW: Found follow target: " + (followTarget != null ? followTarget.getName().getString() : "null"));
         return followTarget != null;
     }
 
@@ -70,6 +72,12 @@ public class GuardFollowVillagerGoal extends Goal {
     public boolean shouldContinue() {
         // Stop if in combat
         if (guard.getTarget() != null) {
+            return false;
+        }
+
+        // Stop if guard mode changed (important for mode switching)
+        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
+        if (guardData == null || guardData.getBehaviorConfig().guardMode() != GuardMode.FOLLOW) {
             return false;
         }
 
@@ -152,9 +160,10 @@ public class GuardFollowVillagerGoal extends Goal {
         // If a specific player is set as follow target, try to find them first
         if (followTargetPlayerId != null && guard.getWorld() instanceof ServerWorld serverWorld) {
             PlayerEntity targetPlayer = serverWorld.getPlayerByUuid(followTargetPlayerId);
-            if (targetPlayer != null && !targetPlayer.isSpectator() && !targetPlayer.isCreative()) {
+            if (targetPlayer != null && !targetPlayer.isSpectator()) {
                 double distance = guard.squaredDistanceTo(targetPlayer);
                 if (distance <= MAX_FOLLOW_DISTANCE * MAX_FOLLOW_DISTANCE) {
+                    System.out.println("GUARD FOLLOW: Found specific player " + targetPlayer.getName().getString() + " at distance " + Math.sqrt(distance));
                     return targetPlayer;
                 }
             }
@@ -162,7 +171,8 @@ public class GuardFollowVillagerGoal extends Goal {
 
         // Fall back to nearest player if follow target not found
         PlayerEntity nearestPlayer = guard.getWorld().getClosestPlayer(guard, MAX_FOLLOW_DISTANCE);
-        if (nearestPlayer != null && !nearestPlayer.isSpectator() && !nearestPlayer.isCreative()) {
+        if (nearestPlayer != null && !nearestPlayer.isSpectator()) {
+            System.out.println("GUARD FOLLOW: Found nearest player " + nearestPlayer.getName().getString());
             return nearestPlayer;
         }
 
@@ -216,17 +226,10 @@ public class GuardFollowVillagerGoal extends Goal {
     }
 
     /**
-     * Checks if this villager is a guard
-     */
-    private boolean isGuard() {
-        return guard.getVillagerData().getProfession().id().equals("guard");
-    }
-
-    /**
-     * Checks if another villager is a guard
+     * Checks if another villager is a guard by checking for guard data
      */
     private boolean isGuard(VillagerEntity villager) {
-        return villager.getVillagerData().getProfession().id().equals("guard");
+        return GuardDataManager.get(villager.getWorld()).getGuardData(villager.getUuid()) != null;
     }
 
     /**
