@@ -26,11 +26,13 @@ public class GuardData {
     private static final String NBT_KEY_RANK_DATA = "GuardRankData";
     private static final String NBT_KEY_GUARD_DATA = "XeenaaGuardData";
     private static final String NBT_KEY_VERSION = "DataVersion";
-    private static final int CURRENT_VERSION = 3; // Incremented for rank system addition
+    private static final String NBT_KEY_BEHAVIOR_CONFIG = "BehaviorConfig";
+    private static final int CURRENT_VERSION = 4; // Incremented for behavior configuration addition
 
     private final UUID villagerId;
     private GuardRole currentRole;
     private GuardRankData rankData;
+    private com.xeenaa.villagermanager.config.GuardBehaviorConfig behaviorConfig;
 
 
     /**
@@ -68,6 +70,17 @@ public class GuardData {
         this.villagerId = villagerId;
         this.currentRole = GuardRole.GUARD; // Default role
         this.rankData = new GuardRankData(villagerId); // Initialize rank data
+        this.behaviorConfig = loadDefaultBehaviorConfig(); // Load default behavior from config
+    }
+
+    /**
+     * Loads default behavior configuration from ModConfig.
+     * Note: ModConfig may still have old fields, but we use the new GuardBehaviorConfig.DEFAULT.
+     */
+    private static com.xeenaa.villagermanager.config.GuardBehaviorConfig loadDefaultBehaviorConfig() {
+        // Always use the built-in default configuration
+        // ModConfig will be updated separately if needed
+        return com.xeenaa.villagermanager.config.GuardBehaviorConfig.DEFAULT;
     }
 
     /**
@@ -116,6 +129,11 @@ public class GuardData {
             nbt.put(NBT_KEY_RANK_DATA, rankData.writeToNbt());
         }
 
+        // Serialize behavior configuration
+        if (behaviorConfig != null) {
+            nbt.put(NBT_KEY_BEHAVIOR_CONFIG, behaviorConfig.toNbt());
+        }
+
         return nbt;
     }
 
@@ -141,6 +159,15 @@ public class GuardData {
         }
         if (nbt.contains(NBT_KEY_RANK_DATA)) {
             rankData.readFromNbt(nbt.getCompound(NBT_KEY_RANK_DATA));
+        }
+
+        // Load behavior configuration
+        if (nbt.contains(NBT_KEY_BEHAVIOR_CONFIG)) {
+            behaviorConfig = com.xeenaa.villagermanager.config.GuardBehaviorConfig.fromNbt(
+                nbt.getCompound(NBT_KEY_BEHAVIOR_CONFIG));
+        } else {
+            // Use default configuration for guards without saved config
+            behaviorConfig = loadDefaultBehaviorConfig();
         }
 
         // Equipment data is ignored if present (legacy compatibility)
@@ -189,5 +216,32 @@ public class GuardData {
             rankData = new GuardRankData(villagerId);
         }
         return rankData;
+    }
+
+    /**
+     * Gets the guard behavior configuration.
+     *
+     * @return the current behavior configuration
+     */
+    public com.xeenaa.villagermanager.config.GuardBehaviorConfig getBehaviorConfig() {
+        if (behaviorConfig == null) {
+            behaviorConfig = loadDefaultBehaviorConfig();
+        }
+        return behaviorConfig;
+    }
+
+    /**
+     * Sets the guard behavior configuration.
+     *
+     * @param config the new behavior configuration
+     */
+    public void setBehaviorConfig(com.xeenaa.villagermanager.config.GuardBehaviorConfig config) {
+        if (config == null) {
+            XeenaaVillagerManager.LOGGER.warn("Attempted to set null behavior config");
+            return;
+        }
+
+        this.behaviorConfig = config;
+        XeenaaVillagerManager.LOGGER.debug("Updated behavior config for guard {}", villagerId);
     }
 }

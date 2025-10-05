@@ -1,6 +1,7 @@
 package com.xeenaa.villagermanager.threat;
 
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
+import com.xeenaa.villagermanager.ai.performance.GuardAIScheduler;
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.data.GuardDataManager;
 import net.minecraft.entity.LivingEntity;
@@ -10,6 +11,8 @@ import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.Box;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,6 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0.0
  */
 public class ThreatDetectionManager {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ThreatDetectionManager.class);
     private static final Map<String, ThreatDetectionManager> INSTANCES = new ConcurrentHashMap<>();
 
     // Detection configuration
@@ -46,6 +50,13 @@ public class ThreatDetectionManager {
     private static final double BASE_DETECTION_RANGE = 16.0;
     private static final double EXTENDED_DETECTION_RANGE = 24.0;
     private static final double CLOSE_THREAT_RANGE = 8.0;
+
+    // Rank-based detection range scaling
+    private static final double TIER_0_RANGE = 12.0;  // Recruit
+    private static final double TIER_1_RANGE = 16.0;  // Tier 1
+    private static final double TIER_2_RANGE = 20.0;  // Tier 2
+    private static final double TIER_3_RANGE = 24.0;  // Tier 3
+    private static final double TIER_4_RANGE = 28.0;  // Tier 4 (Knight/Sharpshooter)
 
     // Performance optimization
     private static final int MAX_THREATS_PER_SCAN = 10;
@@ -80,7 +91,7 @@ public class ThreatDetectionManager {
 
     /**
      * Detects the highest priority threat for a guard villager.
-     * Uses caching and cooldowns for performance optimization.
+     * Uses intelligent scheduling, caching, and cooldowns for performance optimization.
      *
      * @param guard The guard villager to detect threats for
      * @return The highest priority threat, or null if none found
@@ -93,15 +104,14 @@ public class ThreatDetectionManager {
         UUID guardId = guard.getUuid();
         int currentTick = world.getServer().getTicks();
 
-        // Check cooldown for this specific guard
-        Integer lastScan = guardCooldowns.get(guardId);
-        if (lastScan != null && currentTick - lastScan < DETECTION_COOLDOWN) {
+        // Use intelligent scheduler to determine if this guard should detect threats this tick
+        GuardAIScheduler scheduler = GuardAIScheduler.get(world);
+        if (!scheduler.shouldDetectThreats(guard)) {
             // Return cached threat if still valid
             return getCachedThreat(guard);
         }
 
-        // Update cooldown
-        guardCooldowns.put(guardId, currentTick);
+        // No need for manual cooldown tracking - scheduler handles it
 
         // Get guard data for detection range calculation
         GuardData guardData = GuardDataManager.get(world).getGuardData(guardId);
@@ -111,6 +121,9 @@ public class ThreatDetectionManager {
 
         // Calculate detection range based on rank
         double detectionRange = calculateDetectionRange(guardData);
+        int tier = guardData.getRankData().getCurrentTier();
+        String rankName = guardData.getRankData().getCurrentRank().getDisplayName();
+        double responseSpeed = getResponseSpeedForGuard(guard);
 
         // Perform threat detection
         List<ThreatInfo> threats = detectAllThreats(guard, detectionRange);
@@ -122,6 +135,19 @@ public class ThreatDetectionManager {
         ThreatInfo primaryThreat = threats.stream()
             .max(Comparator.comparingInt(ThreatInfo::getPriorityValue))
             .orElse(null);
+
+        // LOG THREAT DETECTION
+        if (primaryThreat != null) {
+            LOGGER.info("[THREAT DETECTED] Guard {} (Rank: {}, Tier: {}) detected {} at {:.2f} blocks | Detection Range: {:.2f} | Response Speed: {:.2f}x | Priority: {}",
+                guardId.toString().substring(0, 8),
+                rankName,
+                tier,
+                primaryThreat.getThreatEntity().getName().getString(),
+                Math.sqrt(primaryThreat.getDistance()),
+                detectionRange,
+                responseSpeed,
+                primaryThreat.getPriority());
+        }
 
         // Update threat memory
         if (primaryThreat != null) {
@@ -196,23 +222,47 @@ public class ThreatDetectionManager {
         List<ThreatInfo> threats = new ArrayList<>();
         Box detectionBox = guard.getBoundingBox().expand(range);
 
-        // Detect hostile entities
+        // Detect hostile entities - OPTIMIZED: First filter by alive only, defer expensive canSee check
         List<HostileEntity> hostiles = world.getEntitiesByClass(
             HostileEntity.class,
             detectionBox,
-            hostile -> hostile.isAlive() && guard.canSee(hostile)
+            HostileEntity::isAlive
         );
+
+        // Early exit if no hostiles nearby
+        if (hostiles.isEmpty()) {
+            return threats;
+        }
+
+        // Sort hostiles by distance (closer threats are higher priority)
+        // This allows us to process closer threats first and potentially skip distant ones
+        hostiles.sort(Comparator.comparingDouble(guard::squaredDistanceTo));
 
         // Analyze each hostile for threat level
         for (HostileEntity hostile : hostiles) {
+            // Perform expensive visibility check only when needed
+            // Skip if we already have enough high-priority threats
+            if (threats.size() >= MAX_THREATS_PER_SCAN) {
+                break;
+            }
+
+            // Visibility check is expensive (raytrace), so do it only after distance check
+            double distance = guard.squaredDistanceTo(hostile);
+            if (distance > range * range) {
+                continue;  // Too far, skip
+            }
+
+            // Only check line of sight for distant threats
+            // Close threats (<8 blocks) don't need visibility check
+            if (distance > CLOSE_THREAT_RANGE * CLOSE_THREAT_RANGE) {
+                if (!guard.canSee(hostile)) {
+                    continue;  // Can't see, skip
+                }
+            }
+
             ThreatInfo threat = analyzeThreat(guard, hostile, range);
             if (threat != null) {
                 threats.add(threat);
-
-                // Limit threats per scan for performance
-                if (threats.size() >= MAX_THREATS_PER_SCAN) {
-                    break;
-                }
             }
         }
 
@@ -308,10 +358,18 @@ public class ThreatDetectionManager {
     }
 
     private double calculateDetectionRange(GuardData guardData) {
-        // Use tier-based detection range: 8 + (tier * 2) blocks
-        // Tier 1 = 8 blocks, Tier 2 = 10 blocks, Tier 3 = 12 blocks, Tier 4 = 14 blocks, Tier 5 = 16 blocks
+        // Use tier-based detection range scaling with rank integration
         int tier = guardData.getRankData().getCurrentTier();
-        double baseRange = 8.0 + (tier * 2.0);
+
+        // Get base detection range based on rank tier
+        double baseRange = switch (tier) {
+            case 0 -> TIER_0_RANGE;  // Recruit: 12 blocks
+            case 1 -> TIER_1_RANGE;  // Tier 1: 16 blocks
+            case 2 -> TIER_2_RANGE;  // Tier 2: 20 blocks
+            case 3 -> TIER_3_RANGE;  // Tier 3: 24 blocks
+            case 4 -> TIER_4_RANGE;  // Tier 4: 28 blocks (Knight/Sharpshooter)
+            default -> TIER_0_RANGE;
+        };
 
         // Role-specific modifications
         switch (guardData.getRole()) {
@@ -376,5 +434,53 @@ public class ThreatDetectionManager {
 
     private boolean isGuard(VillagerEntity villager) {
         return villager.getVillagerData().getProfession().id().equals("guard");
+    }
+
+    /**
+     * Gets the detection range for a guard based on their rank tier.
+     * Higher ranks can detect threats from further away.
+     *
+     * @param guard The guard villager
+     * @return Detection range in blocks
+     */
+    private double getDetectionRangeForGuard(VillagerEntity guard) {
+        GuardData guardData = GuardDataManager.get(world).getGuardData(guard.getUuid());
+        if (guardData == null) {
+            return TIER_0_RANGE; // Default to recruit range
+        }
+
+        int tier = guardData.getRankData().getCurrentTier();
+        return switch (tier) {
+            case 0 -> TIER_0_RANGE;  // Recruit: 12 blocks
+            case 1 -> TIER_1_RANGE;  // Tier 1: 16 blocks
+            case 2 -> TIER_2_RANGE;  // Tier 2: 20 blocks
+            case 3 -> TIER_3_RANGE;  // Tier 3: 24 blocks
+            case 4 -> TIER_4_RANGE;  // Tier 4: 28 blocks
+            default -> TIER_0_RANGE;
+        };
+    }
+
+    /**
+     * Gets the response speed multiplier based on guard tier.
+     * Higher ranks react faster to threats.
+     *
+     * @param guard The guard villager
+     * @return Response speed multiplier (higher = faster)
+     */
+    private double getResponseSpeedForGuard(VillagerEntity guard) {
+        GuardData guardData = GuardDataManager.get(world).getGuardData(guard.getUuid());
+        if (guardData == null) {
+            return 1.0; // Default speed
+        }
+
+        int tier = guardData.getRankData().getCurrentTier();
+        return switch (tier) {
+            case 0 -> 1.0;   // Recruit: Normal speed
+            case 1 -> 1.1;   // Tier 1: 10% faster
+            case 2 -> 1.2;   // Tier 2: 20% faster
+            case 3 -> 1.3;   // Tier 3: 30% faster
+            case 4 -> 1.5;   // Tier 4: 50% faster
+            default -> 1.0;
+        };
     }
 }

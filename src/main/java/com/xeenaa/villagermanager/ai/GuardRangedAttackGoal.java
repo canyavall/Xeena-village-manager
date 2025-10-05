@@ -19,6 +19,8 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.EnumSet;
 import java.util.Optional;
 
@@ -27,6 +29,7 @@ import java.util.Optional;
  * Implements glass cannon specialization with distance maintenance and kiting tactics.
  */
 public class GuardRangedAttackGoal extends Goal {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GuardRangedAttackGoal.class);
     private final VillagerEntity guard;
     private int attackCooldown = 0;
     private int repositionCooldown = 0;
@@ -289,18 +292,11 @@ public class GuardRangedAttackGoal extends Goal {
         // Try to use special abilities based on rank
         boolean usedSpecialAttack = false;
 
-        if (tier >= 5) {
+        if (tier >= 4) {
             float random = guard.getRandom().nextFloat();
             if (random < 0.2f) {
-                usedSpecialAttack = specialAbilities.useAbility(GuardSpecialAbilities.AbilityType.EXPLOSIVE_SHOT, target);
+                usedSpecialAttack = specialAbilities.useAbility(GuardSpecialAbilities.AbilityType.DOUBLE_SHOT, target);
             } else if (random < 0.35f) {
-                usedSpecialAttack = specialAbilities.useAbility(GuardSpecialAbilities.AbilityType.PIERCING_SHOT, target);
-            }
-        }
-
-        if (!usedSpecialAttack && tier >= 4) {
-            float random = guard.getRandom().nextFloat();
-            if (random < 0.3f) {
                 usedSpecialAttack = specialAbilities.useAbility(GuardSpecialAbilities.AbilityType.MULTISHOT, target);
             } else if (random < 0.5f) {
                 usedSpecialAttack = specialAbilities.useAbility(GuardSpecialAbilities.AbilityType.SLOWING_ARROW, target);
@@ -322,8 +318,20 @@ public class GuardRangedAttackGoal extends Goal {
      * Performs basic ranged attack with accuracy based on tier
      */
     private void performBasicRangedAttack(LivingEntity target, int tier) {
+        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
+        String rankName = guardData != null ? guardData.getRankData().getCurrentRank().getDisplayName() : "UNKNOWN";
+
         // Create arrow entity
         ArrowEntity arrow = new ArrowEntity(guard.getWorld(), guard, new ItemStack(Items.ARROW), null);
+
+        // Apply slowness effect to arrows (Slowness I for 3 seconds = 35% speed reduction)
+        arrow.addEffect(new net.minecraft.entity.effect.StatusEffectInstance(
+            net.minecraft.entity.effect.StatusEffects.SLOWNESS,
+            60, // 3 seconds (20 ticks/sec * 3)
+            0,  // Amplifier 0 = Slowness I (35% speed reduction)
+            false,
+            false
+        ));
 
         // Improved accuracy for higher tiers
         float accuracy = Math.max(1.0f, 14 - tier * 2);
@@ -342,6 +350,16 @@ public class GuardRangedAttackGoal extends Goal {
         guard.getWorld().spawnEntity(arrow);
         guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
             SoundEvents.ENTITY_ARROW_SHOOT, guard.getSoundCategory(), 1.0f, 1.0f);
+
+        // LOG RANGED COMBAT EVENT
+        LOGGER.info("[RANGED COMBAT] Guard {} (Rank: {}, Tier: {}) shot slowness arrow at {} | Distance: {:.2f} blocks | Accuracy: {:.2f} | Velocity: {:.2f}",
+            guard.getUuid().toString().substring(0, 8),
+            rankName,
+            tier,
+            target.getName().getString(),
+            horizontalDistance,
+            accuracy,
+            velocity);
     }
 
     /**
@@ -356,7 +374,7 @@ public class GuardRangedAttackGoal extends Goal {
      */
     private boolean isRangedSpecialization(GuardRankData rankData) {
         if (rankData.getChosenPath() != null) {
-            return rankData.getChosenPath().getId().equals("marksman");
+            return rankData.getChosenPath().getId().equals("ranged");
         }
 
         // Check current rank for specialization

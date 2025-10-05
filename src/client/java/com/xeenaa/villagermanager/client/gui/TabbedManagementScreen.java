@@ -267,6 +267,26 @@ public class TabbedManagementScreen extends Screen {
     }
 
     @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        // Forward mouse drag events to active tab
+        if (activeTab != null && activeTab.mouseDragged(mouseX, mouseY, button, deltaX, deltaY)) {
+            return true;
+        }
+
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        // Forward mouse release events to active tab
+        if (activeTab != null && activeTab.mouseReleased(mouseX, mouseY, button)) {
+            return true;
+        }
+
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
     public boolean shouldPause() {
         return false; // Keep game running for multiplayer compatibility
     }

@@ -19,6 +19,8 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +32,7 @@ import java.util.UUID;
  * Handles cooldowns, effects, and ability progression.
  */
 public class GuardSpecialAbilities {
+    private static final Logger LOGGER = LoggerFactory.getLogger(GuardSpecialAbilities.class);
     private static final Map<UUID, GuardSpecialAbilities> INSTANCES = new HashMap<>();
 
     // Ability IDs
@@ -45,7 +48,7 @@ public class GuardSpecialAbilities {
         MULTISHOT,       // Tier 4+: Fire multiple arrows
         SLOWING_ARROW,   // Tier 4+: Arrows apply slowness
         EXPLOSIVE_SHOT,  // Tier 5: Arrows explode on impact
-        PIERCING_SHOT    // Tier 5: Arrows pierce through enemies
+        DOUBLE_SHOT      // Tier 5: Fire two arrows at different targets
     }
 
     private final VillagerEntity guard;
@@ -62,7 +65,7 @@ public class GuardSpecialAbilities {
         AbilityType.MULTISHOT, 120,       // 6 seconds
         AbilityType.SLOWING_ARROW, 100,   // 5 seconds
         AbilityType.EXPLOSIVE_SHOT, 240,  // 12 seconds
-        AbilityType.PIERCING_SHOT, 180    // 9 seconds
+        AbilityType.DOUBLE_SHOT, 180      // 9 seconds
     );
 
     private GuardSpecialAbilities(VillagerEntity guard) {
@@ -122,13 +125,25 @@ public class GuardSpecialAbilities {
      * Uses an ability if available
      */
     public boolean useAbility(AbilityType ability, LivingEntity target) {
+        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
+        String rankName = guardData != null ? guardData.getRankData().getCurrentRank().getDisplayName() : "UNKNOWN";
+        int tier = guardData != null ? guardData.getRankData().getCurrentTier() : 0;
+
+        LOGGER.info("[ABILITY CHECK] Guard {} (Rank: {}, Tier: {}) checking ability: {}",
+            guard.getUuid().toString().substring(0, 8), rankName, tier, ability);
+
         if (!isAbilityAvailable(ability)) {
+            LOGGER.info("[ABILITY CHECK] Ability {} NOT available (on cooldown or locked)", ability);
             return false;
         }
 
+        LOGGER.info("[ABILITY CHECK] ✓ Ability {} is available, executing...", ability);
         boolean success = executeAbility(ability, target);
         if (success) {
             cooldowns.put(ability, ABILITY_COOLDOWNS.get(ability));
+            LOGGER.info("[ABILITY CHECK] ✓ Ability {} executed successfully", ability);
+        } else {
+            LOGGER.info("[ABILITY CHECK] ✗ Ability {} execution failed", ability);
         }
 
         return success;
@@ -161,13 +176,13 @@ public class GuardSpecialAbilities {
 
             // Ranged abilities (Marksman path)
             case PRECISION_SHOT:
-                return pathId.equals("marksman") && tier >= 3;
+                return pathId.equals("ranged") && tier >= 3;
             case MULTISHOT:
             case SLOWING_ARROW:
-                return pathId.equals("marksman") && tier >= 4;
+                return pathId.equals("ranged") && tier >= 4;
             case EXPLOSIVE_SHOT:
-            case PIERCING_SHOT:
-                return pathId.equals("marksman") && tier >= 5;
+            case DOUBLE_SHOT:
+                return pathId.equals("ranged") && tier >= 4;
 
             default:
                 return false;
@@ -195,8 +210,8 @@ public class GuardSpecialAbilities {
                 return executeSlowingArrow(target);
             case EXPLOSIVE_SHOT:
                 return executeExplosiveShot(target);
-            case PIERCING_SHOT:
-                return executePiercingShot(target);
+            case DOUBLE_SHOT:
+                return executeDoubleShot(target);
             default:
                 return false;
         }
@@ -397,31 +412,84 @@ public class GuardSpecialAbilities {
         return true;
     }
 
-    private boolean executePiercingShot(LivingEntity target) {
-        ItemStack arrow = new ItemStack(Items.ARROW);
-        ArrowEntity projectile = new ArrowEntity(guard.getWorld(), guard, arrow, null);
+    private boolean executeDoubleShot(LivingEntity target) {
+        LOGGER.info("[DOUBLE SHOT EXEC] Guard {} executing Double Shot",
+            guard.getUuid().toString().substring(0, 8));
 
-        // Set piercing level via NBT
-        net.minecraft.nbt.NbtCompound nbt = new net.minecraft.nbt.NbtCompound();
-        projectile.writeNbt(nbt);
-        nbt.putByte("piercing", (byte) 3);
-        projectile.readNbt(nbt);
+        // Find a second target nearby
+        double DETECTION_RANGE = 15.0;
+        Box searchBox = Box.of(guard.getPos(), DETECTION_RANGE * 2, DETECTION_RANGE * 2, DETECTION_RANGE * 2);
+        List<LivingEntity> nearbyEnemies = guard.getWorld().getEntitiesByClass(
+            LivingEntity.class, searchBox,
+            entity -> entity != guard &&
+                     entity != target &&
+                     entity.isAlive() &&
+                     guard.canTarget(entity) &&
+                     guard.canSee(entity)
+        );
 
+        LOGGER.info("[DOUBLE SHOT EXEC] Found {} potential secondary targets", nearbyEnemies.size());
+
+        LivingEntity secondaryTarget = null;
+        double closestDistance = DETECTION_RANGE;
+
+        // Find the closest valid secondary target
+        for (LivingEntity entity : nearbyEnemies) {
+            double distance = guard.squaredDistanceTo(entity);
+            if (Math.sqrt(distance) < closestDistance) {
+                secondaryTarget = entity;
+                closestDistance = Math.sqrt(distance);
+            }
+        }
+
+        // Fire second arrow if we found a target
+        if (secondaryTarget != null) {
+            LOGGER.info("[DOUBLE SHOT EXEC] ✓ FIRING second arrow at {} (distance: {:.2f} blocks)",
+                secondaryTarget.getName().getString(), closestDistance);
+            fireArrowAtTarget(secondaryTarget);
+
+            // Play special sound effect
+            guard.getWorld().playSound(null, guard.getBlockPos(),
+                SoundEvents.ENTITY_ARROW_SHOOT,
+                guard.getSoundCategory(), 1.0f, 1.2f);
+
+            spawnParticles(ParticleTypes.ENCHANT, guard.getPos().add(0, 1.5, 0), 10);
+            return true;
+        }
+
+        LOGGER.info("[DOUBLE SHOT EXEC] ✗ No valid secondary target found");
+        return false;
+    }
+
+    /**
+     * Fires an arrow at the specified target for double shot ability
+     */
+    private void fireArrowAtTarget(LivingEntity target) {
+        // Create arrow entity
+        ArrowEntity arrow = new ArrowEntity(guard.getWorld(), guard, new ItemStack(Items.ARROW), null);
+
+        // Apply slowness effect to arrows (Slowness I for 3 seconds)
+        arrow.addEffect(new StatusEffectInstance(
+            StatusEffects.SLOWNESS,
+            60, // 3 seconds
+            0,  // Slowness I
+            false,
+            false
+        ));
+
+        // Calculate aim
         double deltaX = target.getX() - guard.getX();
-        double deltaY = target.getBodyY(0.3333333333333333) - projectile.getY();
+        double deltaY = target.getBodyY(0.3333333333333333) - arrow.getY();
         double deltaZ = target.getZ() - guard.getZ();
         double horizontalDistance = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
 
-        projectile.setVelocity(deltaX, deltaY + horizontalDistance * 0.20000000298023224, deltaZ, 2.5f, 4);
-        projectile.setDamage(projectile.getDamage() * 1.3); // 30% more damage
-        guard.getWorld().spawnEntity(projectile);
-        guard.swingHand(Hand.MAIN_HAND);
+        // Set velocity with improved accuracy for double shot
+        float velocity = 1.6f;
+        float accuracy = 8.0f;
+        arrow.setVelocity(deltaX, deltaY + horizontalDistance * 0.20000000298023224, deltaZ, velocity, accuracy);
 
-        spawnParticles(ParticleTypes.ENCHANT, guard.getPos().add(0, 1.5, 0), 10);
-        guard.getWorld().playSound(null, guard.getBlockPos(), SoundEvents.ENTITY_ARROW_SHOOT,
-            guard.getSoundCategory(), 1.0f, 1.3f);
-
-        return true;
+        // Spawn arrow
+        guard.getWorld().spawnEntity(arrow);
     }
 
     /**

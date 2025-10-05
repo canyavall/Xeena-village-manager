@@ -43,10 +43,17 @@ public class VillagerManagementScreen extends TabbedManagementScreen {
                 targetVillager.getId());
         }
 
+        // Add config tab for guard villagers
+        ConfigTab configTab = new ConfigTab(targetVillager);
+        if (configTab.isAvailable()) {
+            addTab(configTab);
+            XeenaaVillagerManager.LOGGER.debug("Added config tab for guard villager {}",
+                targetVillager.getId());
+        }
+
         // TODO: Add future tabs here
         // - Trade management tab
         // - Villager statistics tab
-        // - Behavior configuration tab
 
         XeenaaVillagerManager.LOGGER.info("Initialized VillagerManagementScreen with {} tabs for villager {}",
             getTabs().size(), targetVillager.getId());

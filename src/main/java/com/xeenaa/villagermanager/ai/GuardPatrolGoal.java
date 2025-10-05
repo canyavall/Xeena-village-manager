@@ -1,9 +1,13 @@
 package com.xeenaa.villagermanager.ai;
 
+import com.xeenaa.villagermanager.ai.performance.GuardAIScheduler;
+import com.xeenaa.villagermanager.ai.performance.PathfindingCache;
+import com.xeenaa.villagermanager.config.GuardMode;
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.data.GuardDataManager;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
@@ -19,22 +23,26 @@ import java.util.List;
 public class GuardPatrolGoal extends Goal {
     private final VillagerEntity guard;
     private final Random random = new Random();
+    private final PathfindingCache pathCache;
 
     private BlockPos patrolCenter;
     private BlockPos currentTarget;
     private int patrolRadius;
     private int cooldownTicks;
     private int patrolTicks;
+    private int lastPatrolCenterSearchTick = 0;
 
     private static final int DEFAULT_PATROL_RADIUS = 16;
     private static final int MIN_PATROL_DISTANCE = 4;
     private static final int PATROL_COOLDOWN = 100; // 5 seconds between patrol moves
     private static final int MAX_PATROL_TIME = 1200; // 1 minute max patrol time
+    private static final int PATROL_CENTER_SEARCH_COOLDOWN = 6000; // 5 minutes
 
     public GuardPatrolGoal(VillagerEntity guard) {
         this.guard = guard;
         this.setControls(EnumSet.of(Control.MOVE));
         this.patrolRadius = DEFAULT_PATROL_RADIUS;
+        this.pathCache = new PathfindingCache();
     }
 
     @Override
@@ -60,26 +68,50 @@ public class GuardPatrolGoal extends Goal {
             return false;
         }
 
-        // Only patrol if role allows it
-        GuardData.GuardRole role = guardData.getRole();
-        if (role != GuardData.GuardRole.PATROL && role != GuardData.GuardRole.GUARD) {
+        // Only patrol if guard mode is PATROL
+        GuardMode guardMode = guardData.getBehaviorConfig().guardMode();
+        if (guardMode != GuardMode.PATROL) {
             return false;
         }
 
         // Set patrol center to guard post workstation if available
+        // OPTIMIZED: Only search for guard post occasionally (expensive operation)
         if (patrolCenter == null) {
-            BlockPos workstation = findGuardPostWorkstation();
-            if (workstation != null) {
-                patrolCenter = workstation;
+            int currentTick = guard.getWorld() instanceof ServerWorld serverWorld ?
+                serverWorld.getServer().getTicks() : 0;
+
+            if (currentTick - lastPatrolCenterSearchTick > PATROL_CENTER_SEARCH_COOLDOWN) {
+                BlockPos workstation = findGuardPostWorkstation();
+                if (workstation != null) {
+                    patrolCenter = workstation;
+                } else {
+                    // Fallback to current position if no workstation found
+                    patrolCenter = guard.getBlockPos();
+                }
+                lastPatrolCenterSearchTick = currentTick;
             } else {
-                // Fallback to current position if no workstation found
+                // Use current position temporarily until next search
                 patrolCenter = guard.getBlockPos();
             }
         }
 
         // Check if we need to find a new patrol target
+        // OPTIMIZED: Try cache first
         if (currentTarget == null || hasReachedTarget() || patrolTicks > MAX_PATROL_TIME) {
-            currentTarget = findBasicPatrolTarget();
+            if (guard.getWorld() instanceof ServerWorld serverWorld) {
+                int currentTick = serverWorld.getServer().getTicks();
+                BlockPos cached = pathCache.getCachedPatrolPosition(guard.getUuid(), currentTick);
+                if (cached != null) {
+                    currentTarget = cached;
+                } else {
+                    currentTarget = findBasicPatrolTarget();
+                    if (currentTarget != null) {
+                        pathCache.cachePatrolPosition(guard.getUuid(), guard.getBlockPos(), currentTarget, currentTick);
+                    }
+                }
+            } else {
+                currentTarget = findBasicPatrolTarget();
+            }
             patrolTicks = 0;
         }
 
@@ -270,18 +302,34 @@ public class GuardPatrolGoal extends Goal {
     }
 
     /**
-     * Searches for a guard post within a reasonable range
+     * Searches for a guard post within a reasonable range.
+     * OPTIMIZED: Uses spiral search pattern and early exit to reduce block checks.
      */
     private BlockPos findNearbyGuardPost() {
         BlockPos guardPos = guard.getBlockPos();
         int searchRadius = 48; // Search within 48 blocks
 
-        for (int x = -searchRadius; x <= searchRadius; x++) {
-            for (int y = -searchRadius/2; y <= searchRadius/2; y++) {
-                for (int z = -searchRadius; z <= searchRadius; z++) {
-                    BlockPos checkPos = guardPos.add(x, y, z);
-                    if (guard.getWorld().getBlockState(checkPos).getBlock() instanceof com.xeenaa.villagermanager.block.GuardPostBlock) {
-                        return checkPos;
+        // OPTIMIZED: Use spiral search pattern starting from guard position
+        // This finds nearby guard posts much faster than triple nested loop
+        // Most guard posts will be within 16 blocks, so we find them quickly
+
+        // Check concentric squares, starting small
+        for (int radius = 4; radius <= searchRadius; radius += 4) {
+            // Only check the perimeter of each square, not the interior
+            for (int x = -radius; x <= radius; x += 4) {
+                for (int y = -8; y <= 8; y += 4) {  // Limited Y search
+                    // Check four edges of the square
+                    BlockPos[] edgePositions = {
+                        guardPos.add(x, y, -radius),  // North edge
+                        guardPos.add(x, y, radius),   // South edge
+                        guardPos.add(-radius, y, x),  // West edge
+                        guardPos.add(radius, y, x)    // East edge
+                    };
+
+                    for (BlockPos checkPos : edgePositions) {
+                        if (guard.getWorld().getBlockState(checkPos).getBlock() instanceof com.xeenaa.villagermanager.block.GuardPostBlock) {
+                            return checkPos;
+                        }
                     }
                 }
             }

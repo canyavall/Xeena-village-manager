@@ -39,7 +39,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Mixin to add Guard AI behaviors to villagers with the Guard profession.
  */
 @Mixin(VillagerEntity.class)
-public abstract class VillagerAIMixin extends MerchantEntity {
+public abstract class VillagerAIMixin extends MerchantEntity implements com.xeenaa.villagermanager.ai.GuardAIAccessor {
     @Shadow
     public abstract VillagerData getVillagerData();
 
@@ -51,6 +51,15 @@ public abstract class VillagerAIMixin extends MerchantEntity {
 
     @Unique
     private GuardSpecialAbilities guardAbilities = null;
+
+    @Unique
+    private int outOfCombatTicks = 0;
+
+    @Unique
+    private static final int REGENERATION_START_DELAY = 100; // 5 seconds out of combat
+
+    @Unique
+    private static final int REGENERATION_TICK_INTERVAL = 20; // Heal every 1 second
 
     protected VillagerAIMixin(EntityType<? extends MerchantEntity> entityType, World world) {
         super(entityType, world);
@@ -122,8 +131,9 @@ public abstract class VillagerAIMixin extends MerchantEntity {
             tier = rankData.getCurrentTier();
             String pathId = rankData.getChosenPath() != null ?
                 rankData.getChosenPath().getId() : rankData.getCurrentRank().getPath().getId();
+            // Check for ranged path
             isRangedSpecialization = pathId.equals("ranged");
-            System.out.println("GUARD AI: Guard has data - Tier: " + tier + ", Path: " + pathId + ", Ranged: " + isRangedSpecialization);
+            System.out.println("GUARD AI: Guard has data - Tier: " + tier + ", Path: " + pathId + ", Is Marksman (Ranged): " + isRangedSpecialization);
         } else {
             System.out.println("GUARD AI: No guard data found for " + self.getUuid() + " - using defaults");
         }
@@ -131,9 +141,20 @@ public abstract class VillagerAIMixin extends MerchantEntity {
         // Auto-equip weapons based on specialization
         equipGuardWeapon(self, isRangedSpecialization, tier);
 
-        // Priority 0: Highest priority - direct attack goal (bypasses vanilla targeting)
+        // Priority 0: Target and attack enemies (with proper cooldowns)
         this.goalSelector.add(0, new com.xeenaa.villagermanager.ai.GuardDirectAttackGoal(self));
         System.out.println("GUARD AI: Added GuardDirectAttackGoal");
+
+        // Priority 1: High priority - defend villagers from threats
+        this.goalSelector.add(1, new GuardDefendVillageGoal(self));
+        System.out.println("GUARD AI: Added GuardDefendVillageGoal");
+
+        // Priority 2: High priority - retreat when health is low
+        this.goalSelector.add(2, new com.xeenaa.villagermanager.ai.GuardRetreatGoal(self));
+        System.out.println("GUARD AI: Added GuardRetreatGoal");
+
+        // NOTE: GuardMeleeAttackGoal and GuardRangedAttackGoal removed - all combat handled by GuardDirectAttackGoal
+        // GuardDirectAttackGoal now includes Tier 4 special abilities (Knight Knockback, Sharpshooter Double Shot)
 
         // Priority 5: Medium-low priority - follow villagers for protection
         this.goalSelector.add(5, new GuardFollowVillagerGoal(self));
@@ -154,7 +175,8 @@ public abstract class VillagerAIMixin extends MerchantEntity {
             goal.getGoal() instanceof GuardMeleeAttackGoal ||
             goal.getGoal() instanceof GuardRangedAttackGoal ||
             goal.getGoal() instanceof GuardFollowVillagerGoal ||
-            goal.getGoal() instanceof GuardPatrolGoal
+            goal.getGoal() instanceof GuardPatrolGoal ||
+            goal.getGoal() instanceof com.xeenaa.villagermanager.ai.GuardRetreatGoal
         );
 
         this.targetSelector.getGoals().removeIf(goal ->
@@ -167,7 +189,8 @@ public abstract class VillagerAIMixin extends MerchantEntity {
     }
 
     /**
-     * Applies rank-based attribute modifications based on specialization
+     * Applies rank-based attribute modifications using RankStats from the rank system.
+     * This ensures combat stats scale consistently with rank progression.
      */
     @Unique
     private void applyRankBasedAttributes() {
@@ -181,49 +204,60 @@ public abstract class VillagerAIMixin extends MerchantEntity {
         }
 
         GuardRankData rankData = guardData.getRankData();
-        int tier = rankData.getCurrentTier();
-        String pathId = rankData.getChosenPath() != null ?
-            rankData.getChosenPath().getId() : rankData.getCurrentRank().getPath().getId();
+        com.xeenaa.villagermanager.data.rank.RankStats stats = rankData.getCurrentRank().getStats();
 
-        // Base guard stats
-        double baseHealth = 20.0;
-        double baseSpeed = 0.5;
-        double baseAttackDamage = 1.0;
-
-        // Apply specialization and tier bonuses
-        if (pathId.equals("man_at_arms")) {
-            // Tank specialization: Higher health, slower speed
-            baseHealth = 25.0 + (tier * 5.0); // 25-45 health
-            baseSpeed = 0.45 + (tier * 0.02); // Slightly slower but improves with tier
-            baseAttackDamage = 2.0 + (tier * 0.5); // 2.0-4.0 damage
-        } else if (pathId.equals("marksman")) {
-            // Glass cannon: Lower health, higher speed
-            baseHealth = 20.0 + (tier * 2.0); // 20-28 health
-            baseSpeed = 0.55 + (tier * 0.03); // Faster movement
-            baseAttackDamage = 1.5 + (tier * 0.3); // 1.5-2.7 damage (for melee backup)
-        } else {
-            // Recruit or unknown: Default stats with minor tier scaling
-            baseHealth = 20.0 + (tier * 2.0);
-            baseSpeed = 0.5 + (tier * 0.01);
-            baseAttackDamage = 1.0 + (tier * 0.2);
-        }
-
-        // Apply calculated attributes
+        // Apply health from RankStats
         EntityAttributeInstance healthAttribute = this.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH);
         if (healthAttribute != null) {
-            healthAttribute.setBaseValue(baseHealth);
-            this.setHealth((float) baseHealth);
+            healthAttribute.setBaseValue(stats.getMaxHealth());
+
+            // Heal to max health on rank change to prevent death from stat changes
+            float currentHealth = this.getHealth();
+            float maxHealth = (float) stats.getMaxHealth();
+            if (currentHealth > maxHealth) {
+                this.setHealth(maxHealth);
+            } else {
+                // Scale current health proportionally if gaining health
+                float healthRatio = currentHealth / this.getMaxHealth();
+                this.setHealth(maxHealth * healthRatio);
+            }
         }
 
+        // Apply movement speed from RankStats
         EntityAttributeInstance speedAttribute = this.getAttributeInstance(EntityAttributes.GENERIC_MOVEMENT_SPEED);
         if (speedAttribute != null) {
-            speedAttribute.setBaseValue(baseSpeed);
+            speedAttribute.setBaseValue(stats.getMovementSpeed());
         }
 
+        // Apply attack damage from RankStats
         EntityAttributeInstance attackAttribute = this.getAttributeInstance(EntityAttributes.GENERIC_ATTACK_DAMAGE);
         if (attackAttribute != null) {
-            attackAttribute.setBaseValue(baseAttackDamage);
+            attackAttribute.setBaseValue(stats.getAttackDamage());
         }
+
+        // Apply knockback resistance from RankStats
+        EntityAttributeInstance knockbackAttribute = this.getAttributeInstance(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE);
+        if (knockbackAttribute != null) {
+            knockbackAttribute.setBaseValue(stats.getKnockbackResistance());
+        }
+
+        // Apply armor value from RankStats
+        EntityAttributeInstance armorAttribute = this.getAttributeInstance(EntityAttributes.GENERIC_ARMOR);
+        if (armorAttribute != null) {
+            armorAttribute.setBaseValue(stats.getArmorValue());
+        }
+
+        // Apply attack speed from RankStats
+        EntityAttributeInstance attackSpeedAttribute = this.getAttributeInstance(EntityAttributes.GENERIC_ATTACK_SPEED);
+        if (attackSpeedAttribute != null) {
+            attackSpeedAttribute.setBaseValue(stats.getAttackSpeed());
+        }
+
+        System.out.println("GUARD RANK: Applied attributes for " + self.getUuid() +
+                         " - HP: " + stats.getMaxHealth() +
+                         ", DMG: " + stats.getAttackDamage() +
+                         ", SPD: " + stats.getMovementSpeed() +
+                         ", Armor: " + stats.getArmorValue());
     }
 
     /**
@@ -342,6 +376,71 @@ public abstract class VillagerAIMixin extends MerchantEntity {
         // Tick special abilities if guard is active
         if (guardAbilities != null && this.getVillagerData().getProfession() == ModProfessions.GUARD) {
             guardAbilities.tick();
+
+            // Handle regeneration and passive effects for guards
+            handleGuardPassiveEffects(self);
+        }
+    }
+
+    /**
+     * Handles passive effects for guards including regeneration and damage resistance
+     */
+    @Unique
+    private void handleGuardPassiveEffects(VillagerEntity guard) {
+        // Skip on client side
+        if (guard.getWorld().isClient()) {
+            return;
+        }
+
+        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
+        if (guardData == null) {
+            return;
+        }
+
+        GuardRankData rankData = guardData.getRankData();
+        int tier = rankData.getCurrentTier();
+        boolean hasTarget = guard.getTarget() != null && guard.getTarget().isAlive();
+
+        // Track combat status
+        if (hasTarget) {
+            outOfCombatTicks = 0;
+        } else {
+            outOfCombatTicks++;
+        }
+
+        // Regeneration for Tier 3+ guards when out of combat
+        if (tier >= 3 && outOfCombatTicks >= REGENERATION_START_DELAY) {
+            if (outOfCombatTicks % REGENERATION_TICK_INTERVAL == 0) {
+                float currentHealth = guard.getHealth();
+                float maxHealth = guard.getMaxHealth();
+
+                if (currentHealth < maxHealth) {
+                    // Regeneration rate scales with tier
+                    // Tier 3: 0.5 HP/sec | Tier 4: 1.0 HP/sec
+                    float healAmount = tier >= 4 ? 1.0f : 0.5f;
+                    guard.heal(healAmount);
+                }
+            }
+        }
+
+        // Damage resistance for top-tier guards (Knight/Sharpshooter)
+        if (tier >= 4) {
+            // Apply permanent resistance effect for max-tier guards
+            net.minecraft.entity.effect.StatusEffectInstance currentResistance =
+                guard.getStatusEffect(net.minecraft.entity.effect.StatusEffects.RESISTANCE);
+
+            // Only refresh if not present or about to expire
+            if (currentResistance == null || currentResistance.getDuration() < 20) {
+                // Resistance I (20% damage reduction) for 6 seconds, refreshed continuously
+                guard.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
+                    net.minecraft.entity.effect.StatusEffects.RESISTANCE,
+                    120, // 6 seconds
+                    0,   // Resistance I
+                    true,  // ambient
+                    false, // show particles
+                    false  // show icon
+                ));
+            }
         }
     }
 
@@ -434,6 +533,33 @@ public abstract class VillagerAIMixin extends MerchantEntity {
             case 4 -> new ItemStack(Items.NETHERITE_SWORD);    // Tier 4 (max rank)
             default -> new ItemStack(Items.IRON_SWORD);
         };
+    }
+
+    /**
+     * Public method to re-initialize combat AI goals when rank/specialization changes.
+     * Can be called from ServerPacketHandler after rank purchase.
+     */
+    public void xeenaa$reinitializeCombatGoals(boolean isRangedSpecialization) {
+        VillagerEntity self = (VillagerEntity) (Object) this;
+        System.out.println("GUARD AI: Re-initializing combat goals for guard " + self.getUuid() +
+            ", isRanged=" + isRangedSpecialization);
+
+        // Remove existing combat goals
+        this.goalSelector.getGoals().removeIf(goal ->
+            goal.getGoal() instanceof GuardMeleeAttackGoal ||
+            goal.getGoal() instanceof GuardRangedAttackGoal
+        );
+
+        // Add appropriate combat goal based on specialization
+        if (isRangedSpecialization) {
+            // RANGED: Add ranged attack goal for marksman path
+            this.goalSelector.add(3, new GuardRangedAttackGoal(self, 1.0, 20, 15.0f));
+            System.out.println("GUARD AI: Added GuardRangedAttackGoal (Marksman specialization)");
+        } else {
+            // MELEE: Add melee attack goal for man-at-arms path
+            this.goalSelector.add(3, new GuardMeleeAttackGoal(self, 1.0, true));
+            System.out.println("GUARD AI: Added GuardMeleeAttackGoal (Melee specialization)");
+        }
     }
 
 }

@@ -1,5 +1,6 @@
 package com.xeenaa.villagermanager.ai;
 
+import com.xeenaa.villagermanager.config.GuardMode;
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.data.GuardDataManager;
 import net.minecraft.entity.LivingEntity;
@@ -7,9 +8,11 @@ import net.minecraft.entity.ai.TargetPredicate;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * AI goal that makes guards follow nearby villagers or players for protection.
@@ -52,14 +55,14 @@ public class GuardFollowVillagerGoal extends Goal {
             return false;
         }
 
-        // Check if role allows following
-        GuardData.GuardRole role = guardData.getRole();
-        if (role != GuardData.GuardRole.FOLLOW && role != GuardData.GuardRole.PATROL) {
+        // Check if guard mode is FOLLOW
+        GuardMode guardMode = guardData.getBehaviorConfig().guardMode();
+        if (guardMode != GuardMode.FOLLOW) {
             return false;
         }
 
-        // Find someone to follow
-        followTarget = findFollowTarget();
+        // Find someone to follow (prioritize follow target player if set)
+        followTarget = findFollowTarget(guardData);
         return followTarget != null;
     }
 
@@ -140,26 +143,30 @@ public class GuardFollowVillagerGoal extends Goal {
     }
 
     /**
-     * Finds a suitable target to follow based on guard role and proximity
+     * Finds a suitable target to follow based on guard configuration and proximity.
+     * Prioritizes the follow target player if set in configuration.
      */
-    private LivingEntity findFollowTarget() {
-        GuardData guardData = GuardDataManager.get(guard.getWorld()).getGuardData(guard.getUuid());
-        if (guardData == null) {
-            return null;
-        }
+    private LivingEntity findFollowTarget(GuardData guardData) {
+        UUID followTargetPlayerId = guardData.getBehaviorConfig().followTargetPlayerId();
 
-        GuardData.GuardRole role = guardData.getRole();
-
-        // FOLLOW role prioritizes players, then villagers
-        if (role == GuardData.GuardRole.FOLLOW) {
-            // First, look for players
-            PlayerEntity nearestPlayer = guard.getWorld().getClosestPlayer(guard, MAX_FOLLOW_DISTANCE);
-            if (nearestPlayer != null && !nearestPlayer.isSpectator() && !nearestPlayer.isCreative()) {
-                return nearestPlayer;
+        // If a specific player is set as follow target, try to find them first
+        if (followTargetPlayerId != null && guard.getWorld() instanceof ServerWorld serverWorld) {
+            PlayerEntity targetPlayer = serverWorld.getPlayerByUuid(followTargetPlayerId);
+            if (targetPlayer != null && !targetPlayer.isSpectator() && !targetPlayer.isCreative()) {
+                double distance = guard.squaredDistanceTo(targetPlayer);
+                if (distance <= MAX_FOLLOW_DISTANCE * MAX_FOLLOW_DISTANCE) {
+                    return targetPlayer;
+                }
             }
         }
 
-        // Look for villagers to protect (both FOLLOW and PATROL roles)
+        // Fall back to nearest player if follow target not found
+        PlayerEntity nearestPlayer = guard.getWorld().getClosestPlayer(guard, MAX_FOLLOW_DISTANCE);
+        if (nearestPlayer != null && !nearestPlayer.isSpectator() && !nearestPlayer.isCreative()) {
+            return nearestPlayer;
+        }
+
+        // Look for villagers to protect as last resort
         List<VillagerEntity> nearbyVillagers = guard.getWorld().getTargets(
             VillagerEntity.class,
             FOLLOW_PREDICATE,

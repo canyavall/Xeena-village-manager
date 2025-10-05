@@ -11,6 +11,7 @@ import com.xeenaa.villagermanager.network.GuardEmeraldRefundPacket;
 import com.xeenaa.villagermanager.network.GuardRankSyncPacket;
 import com.xeenaa.villagermanager.network.InitialGuardDataSyncPacket;
 import com.xeenaa.villagermanager.network.RankPurchaseResponsePacket;
+import com.xeenaa.villagermanager.network.GuardConfigSyncPacket;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
@@ -70,6 +71,9 @@ public class GuardDataSyncHandler {
 
             ClientPlayNetworking.registerGlobalReceiver(RankPurchaseResponsePacket.PACKET_ID, GuardDataSyncHandler::handleRankPurchaseResponse);
             LOGGER.info("Successfully registered client-side RankPurchaseResponsePacket handler");
+
+            ClientPlayNetworking.registerGlobalReceiver(GuardConfigSyncPacket.PACKET_ID, GuardDataSyncHandler::handleConfigSync);
+            LOGGER.info("Successfully registered client-side GuardConfigSyncPacket handler");
         } catch (Exception e) {
             LOGGER.error("Failed to register guard data sync handlers", e);
             throw new RuntimeException("Guard data sync handler registration failed", e);
@@ -511,6 +515,70 @@ public class GuardDataSyncHandler {
 
         } catch (Exception e) {
             LOGGER.error("Failed to process rank purchase response for villager: {}", packet.villagerId(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * Handles incoming guard configuration synchronization packets from the server.
+     */
+    private static void handleConfigSync(GuardConfigSyncPacket packet, ClientPlayNetworking.Context context) {
+        Objects.requireNonNull(packet, "Guard config sync packet must not be null");
+        Objects.requireNonNull(context, "Client networking context must not be null");
+
+        packetsReceived++;
+        MinecraftClient client = context.client();
+
+        // Execute on client main thread for thread safety
+        client.execute(() -> {
+            try {
+                processConfigSync(packet, client);
+                packetsProcessed++;
+                LOGGER.info("Successfully processed config sync packet for villager: {}",
+                    packet.villagerId());
+            } catch (Exception e) {
+                processingErrors++;
+                LOGGER.error("Error processing config sync packet for villager {}: {}",
+                    packet.villagerId(), e.getMessage(), e);
+            }
+        });
+    }
+
+    /**
+     * Processes the configuration synchronization packet and updates the client cache.
+     */
+    private static void processConfigSync(GuardConfigSyncPacket packet, MinecraftClient client) {
+        Objects.requireNonNull(packet, "Guard config sync packet must not be null");
+        Objects.requireNonNull(client, "Minecraft client must not be null");
+
+        try {
+            ClientGuardDataCache cache = ClientGuardDataCache.getInstance();
+
+            // Get or create guard data in client cache
+            GuardData guardData = cache.getGuardData(packet.villagerId());
+            if (guardData == null) {
+                guardData = new GuardData(packet.villagerId());
+                cache.updateGuardData(packet.villagerId(), guardData);
+            }
+
+            // Update behavior configuration
+            guardData.setBehaviorConfig(packet.config());
+
+            // Update the cache
+            cache.updateGuardData(packet.villagerId(), guardData);
+
+            LOGGER.info("Updated client config data for villager {}: detection={}, guardMode={}, professionLocked={}, followTarget={}",
+                packet.villagerId(),
+                packet.config().detectionRange(),
+                packet.config().guardMode().getDisplayName(),
+                packet.config().professionLocked(),
+                packet.config().followTargetPlayerId());
+
+            // Refresh GUI if management screen is open for this villager
+            refreshManagementScreenIfOpen(client, packet.villagerId());
+
+        } catch (Exception e) {
+            LOGGER.error("Failed to process config sync for villager: {}", packet.villagerId(), e);
             throw e;
         }
     }

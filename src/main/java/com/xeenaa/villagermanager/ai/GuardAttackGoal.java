@@ -162,7 +162,7 @@ public class GuardAttackGoal extends ActiveTargetGoal<HostileEntity> {
 
     private boolean isRangedSpecialization(com.xeenaa.villagermanager.data.rank.GuardRankData rankData) {
         if (rankData.getChosenPath() != null) {
-            return rankData.getChosenPath().getId().equals("marksman");
+            return rankData.getChosenPath().getId().equals("ranged");
         }
 
         // Check current rank for specialization

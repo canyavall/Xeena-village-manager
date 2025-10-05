@@ -37,6 +37,21 @@ public class ModConfig {
         public int patrol_radius = 48;
         public double experience_gain_rate = 1.0;
         // Equipment system removed - replaced with ranking system
+
+        // Default guard behavior settings
+        public GuardBehaviorSettings default_behavior = new GuardBehaviorSettings();
+    }
+
+    /**
+     * Default guard behavior settings for new guards.
+     * These values are used as defaults for newly created guards.
+     */
+    public static class GuardBehaviorSettings {
+        public double detection_range = 20.0;
+        public String aggression_level = "balanced"; // defensive, balanced, aggressive
+        public boolean patrol_enabled = true;
+        public String combat_mode = "defensive"; // defensive, aggressive
+        public boolean rest_enabled = true;
     }
 
     // Default configuration

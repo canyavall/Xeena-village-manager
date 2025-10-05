@@ -157,6 +157,34 @@ public abstract class Tab {
     }
 
     /**
+     * Handles mouse drag events within the tab content area.
+     *
+     * @param mouseX the mouse x position
+     * @param mouseY the mouse y position
+     * @param button the mouse button being dragged
+     * @param deltaX the horizontal drag distance
+     * @param deltaY the vertical drag distance
+     * @return true if the drag was handled, false otherwise
+     */
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        // Default implementation - subclasses can override
+        return false;
+    }
+
+    /**
+     * Handles mouse release events within the tab content area.
+     *
+     * @param mouseX the mouse x position
+     * @param mouseY the mouse y position
+     * @param button the mouse button that was released
+     * @return true if the release was handled, false otherwise
+     */
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        // Default implementation - subclasses can override
+        return false;
+    }
+
+    /**
      * Handles mouse scroll events within the tab content area.
      *
      * @param mouseX the mouse x position

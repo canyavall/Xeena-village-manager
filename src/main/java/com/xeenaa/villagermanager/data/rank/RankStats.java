@@ -20,7 +20,7 @@ public final class RankStats {
      * Creates a new RankStats instance for melee guards with rank-appropriate scaling
      */
     public static RankStats melee(float maxHealth, float attackDamage) {
-        // Melee guards get progressive speed increase: 0.6 -> 0.8 (Rank 1 -> 5)
+        // Melee guards get progressive speed increase: 0.4 -> 0.6 (Rank 1 -> 5)
         float movementSpeed = calculateMeleeMovementSpeed(maxHealth, attackDamage);
         // Melee guards get high knockback resistance for tanking
         float knockbackResistance = calculateMeleeKnockbackResistance(maxHealth);
@@ -37,7 +37,7 @@ public final class RankStats {
      * Creates a new RankStats instance for ranged guards with rank-appropriate scaling
      */
     public static RankStats ranged(float maxHealth, float attackDamage, float bowDrawSpeed) {
-        // Ranged guards get higher speed: 0.65 -> 0.85 (Rank 1 -> 5)
+        // Ranged guards get higher speed: 0.45 -> 0.65 (Rank 1 -> 5)
         float movementSpeed = calculateRangedMovementSpeed(maxHealth, attackDamage);
         // Low knockback resistance for glass cannon design
         float knockbackResistance = calculateRangedKnockbackResistance(maxHealth);
@@ -53,10 +53,10 @@ public final class RankStats {
     // Helper methods for calculating rank-appropriate stats
 
     private static float calculateMeleeMovementSpeed(float health, float damage) {
-        // Speed scaling: 0.6 (low rank) to 0.8 (high rank)
+        // Speed scaling: 0.4 (low rank) to 0.6 (high rank) - Reduced for better combat balance
         // Base on damage since it correlates with rank progression
         float speedScale = Math.min((damage - 4.0f) / 8.0f, 1.0f); // 0.0 to 1.0
-        return 0.6f + (speedScale * 0.2f); // 0.6 to 0.8
+        return 0.4f + (speedScale * 0.2f); // 0.4 to 0.6
     }
 
     private static float calculateMeleeKnockbackResistance(float health) {
@@ -78,9 +78,9 @@ public final class RankStats {
     }
 
     private static float calculateRangedMovementSpeed(float health, float damage) {
-        // Ranged guards are faster: 0.65 to 0.85
+        // Ranged guards are faster: 0.45 to 0.65 - Reduced for better combat balance
         float damageScale = Math.min((damage - 5.0f) / 7.0f, 1.0f); // 0.0 to 1.0
-        return 0.65f + (damageScale * 0.2f); // 0.65 to 0.85
+        return 0.45f + (damageScale * 0.2f); // 0.45 to 0.65
     }
 
     private static float calculateRangedKnockbackResistance(float health) {

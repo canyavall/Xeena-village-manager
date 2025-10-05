@@ -34,6 +34,7 @@ public class ServerPacketHandler {
         ServerPlayNetworking.registerGlobalReceiver(SelectProfessionPacket.PACKET_ID, ServerPacketHandler::handleSelectProfession);
         ServerPlayNetworking.registerGlobalReceiver(PurchaseRankPacket.PACKET_ID, ServerPacketHandler::handlePurchaseRank);
         ServerPlayNetworking.registerGlobalReceiver(GuardProfessionChangePacket.PACKET_ID, ServerPacketHandler::handleGuardProfessionChange);
+        ServerPlayNetworking.registerGlobalReceiver(GuardConfigPacket.PACKET_ID, ServerPacketHandler::handleGuardConfig);
     }
 
     /**
@@ -67,6 +68,22 @@ public class ServerPacketHandler {
                     XeenaaVillagerManager.LOGGER.warn("Player {} cannot change profession of villager {}",
                         player.getName().getString(), packet.villagerEntityId());
                     return;
+                }
+
+                // Check if profession is locked (for guards)
+                if (villager.getVillagerData().getProfession() == ModProfessions.GUARD) {
+                    GuardDataManager guardManager = GuardDataManager.get(world);
+                    GuardData guardData = guardManager.getGuardData(villager.getUuid());
+
+                    if (guardData != null && guardData.getBehaviorConfig().professionLocked()) {
+                        XeenaaVillagerManager.LOGGER.info("Profession change blocked - villager {} profession is locked",
+                            villager.getId());
+                        player.sendMessage(
+                            net.minecraft.text.Text.literal("This guard's profession is locked. Unlock it in the Config tab first."),
+                            false
+                        );
+                        return;
+                    }
                 }
 
                 // Check if villager is currently a guard and requires warning dialog
@@ -260,6 +277,12 @@ public class ServerPacketHandler {
                 if (rankData.purchaseRank(targetRank, playerEmeralds)) {
                     // Save guard data
                     guardData.saveToVillager(villager, world.getRegistryManager());
+
+                    // Apply new rank attributes to guard villager
+                    applyRankAttributesToGuard(villager, targetRank);
+
+                    // Re-initialize combat AI goals if path has changed
+                    reinitializeCombatGoals(villager, guardData);
 
                     // Re-equip weapon based on new rank/path (clear mainhand to trigger immediate re-equipment)
                     villager.equipStack(net.minecraft.entity.EquipmentSlot.MAINHAND, net.minecraft.item.ItemStack.EMPTY);
@@ -464,6 +487,179 @@ public class ServerPacketHandler {
 
         XeenaaVillagerManager.LOGGER.info("Completed guard profession change: villager {} changed to {}, {} emeralds lost as penalty, guard data cleaned up",
             villager.getId(), Registries.VILLAGER_PROFESSION.getId(newProfession), emeraldsLost);
+    }
+
+    /**
+     * Applies rank-based attributes to a guard villager using RankStats.
+     * This ensures combat effectiveness scales with rank progression.
+     */
+    private static void applyRankAttributesToGuard(VillagerEntity villager, GuardRank rank) {
+        com.xeenaa.villagermanager.data.rank.RankStats stats = rank.getStats();
+
+        // Apply health from RankStats
+        net.minecraft.entity.attribute.EntityAttributeInstance healthAttribute =
+            villager.getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.GENERIC_MAX_HEALTH);
+        if (healthAttribute != null) {
+            double oldMaxHealth = healthAttribute.getValue();
+            healthAttribute.setBaseValue(stats.getMaxHealth());
+
+            // Adjust current health proportionally to prevent death/overheal
+            float currentHealth = villager.getHealth();
+            if (currentHealth > stats.getMaxHealth()) {
+                // Cap health if new max is lower
+                villager.setHealth((float) stats.getMaxHealth());
+            } else if (oldMaxHealth > 0) {
+                // Scale health proportionally if gaining max health
+                float healthRatio = currentHealth / (float) oldMaxHealth;
+                villager.setHealth((float) (stats.getMaxHealth() * healthRatio));
+            }
+        }
+
+        // Apply movement speed from RankStats
+        net.minecraft.entity.attribute.EntityAttributeInstance speedAttribute =
+            villager.getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.GENERIC_MOVEMENT_SPEED);
+        if (speedAttribute != null) {
+            speedAttribute.setBaseValue(stats.getMovementSpeed());
+        }
+
+        // Apply attack damage from RankStats
+        net.minecraft.entity.attribute.EntityAttributeInstance attackAttribute =
+            villager.getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.GENERIC_ATTACK_DAMAGE);
+        if (attackAttribute != null) {
+            attackAttribute.setBaseValue(stats.getAttackDamage());
+        }
+
+        // Apply knockback resistance from RankStats
+        net.minecraft.entity.attribute.EntityAttributeInstance knockbackAttribute =
+            villager.getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE);
+        if (knockbackAttribute != null) {
+            knockbackAttribute.setBaseValue(stats.getKnockbackResistance());
+        }
+
+        // Apply armor value from RankStats
+        net.minecraft.entity.attribute.EntityAttributeInstance armorAttribute =
+            villager.getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.GENERIC_ARMOR);
+        if (armorAttribute != null) {
+            armorAttribute.setBaseValue(stats.getArmorValue());
+        }
+
+        // Apply attack speed from RankStats
+        net.minecraft.entity.attribute.EntityAttributeInstance attackSpeedAttribute =
+            villager.getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.GENERIC_ATTACK_SPEED);
+        if (attackSpeedAttribute != null) {
+            attackSpeedAttribute.setBaseValue(stats.getAttackSpeed());
+        }
+
+        XeenaaVillagerManager.LOGGER.info("Applied rank attributes to guard {} - Rank: {}, HP: {}, DMG: {}, SPD: {}, Armor: {}",
+            villager.getUuid(), rank.getDisplayName(), stats.getMaxHealth(), stats.getAttackDamage(),
+            stats.getMovementSpeed(), stats.getArmorValue());
+    }
+
+    /**
+     * Re-initializes combat AI goals when guard specialization path changes
+     */
+    private static void reinitializeCombatGoals(VillagerEntity villager, GuardData guardData) {
+        GuardRankData rankData = guardData.getRankData();
+        String pathId = rankData.getChosenPath() != null ?
+            rankData.getChosenPath().getId() : rankData.getCurrentRank().getPath().getId();
+        boolean isRangedSpecialization = pathId.equals("ranged");
+
+        XeenaaVillagerManager.LOGGER.info("Re-initializing combat goals for guard {} - Path: {}, Is Marksman: {}",
+            villager.getUuid(), pathId, isRangedSpecialization);
+
+        // Call the accessor method through the interface
+        ((com.xeenaa.villagermanager.ai.GuardAIAccessor)villager).xeenaa$reinitializeCombatGoals(isRangedSpecialization);
+    }
+
+    /**
+     * Handle guard configuration update packet from client
+     */
+    private static void handleGuardConfig(GuardConfigPacket packet, ServerPlayNetworking.Context context) {
+        ServerPlayerEntity player = context.player();
+        // Ensure we're running on the server thread
+        player.getServer().execute(() -> {
+            try {
+                XeenaaVillagerManager.LOGGER.info("Processing guard config update from player: {} for villager: {}",
+                    player.getName().getString(), packet.villagerId());
+
+                // Validate packet data
+                if (!packet.isValid()) {
+                    XeenaaVillagerManager.LOGGER.warn("Invalid guard config packet from {}",
+                        player.getName().getString());
+                    return;
+                }
+
+                // Find the villager entity
+                ServerWorld world = (ServerWorld) player.getWorld();
+                Entity entity = null;
+
+                // Search for villager by UUID in all loaded entities
+                for (Entity e : world.iterateEntities()) {
+                    if (e instanceof VillagerEntity && e.getUuid().equals(packet.villagerId())) {
+                        entity = e;
+                        break;
+                    }
+                }
+
+                if (!(entity instanceof VillagerEntity villager)) {
+                    XeenaaVillagerManager.LOGGER.warn("Villager {} not found or not loaded", packet.villagerId());
+                    return;
+                }
+
+                // Validate this is a guard villager
+                if (villager.getVillagerData().getProfession() != ModProfessions.GUARD) {
+                    XeenaaVillagerManager.LOGGER.warn("Villager {} is not a guard", packet.villagerId());
+                    return;
+                }
+
+                // Validate the player can interact with this villager
+                if (!canPlayerChangeProfession(player, villager)) {
+                    XeenaaVillagerManager.LOGGER.warn("Player {} cannot configure villager {}",
+                        player.getName().getString(), packet.villagerId());
+                    return;
+                }
+
+                // Get or create guard data
+                GuardDataManager guardManager = GuardDataManager.get(world);
+                GuardData guardData = guardManager.getGuardData(packet.villagerId());
+                if (guardData == null) {
+                    XeenaaVillagerManager.LOGGER.warn("Guard data not found for villager {}", packet.villagerId());
+                    return;
+                }
+
+                // Update configuration
+                guardData.setBehaviorConfig(packet.config());
+
+                // Save guard data
+                guardData.saveToVillager(villager, world.getRegistryManager());
+
+                // Re-initialize AI goals to apply new configuration
+                villager.reinitializeBrain(world);
+
+                // Send sync packet to all clients
+                GuardConfigSyncPacket syncPacket = new GuardConfigSyncPacket(
+                    packet.villagerId(),
+                    packet.config()
+                );
+
+                // Send to all players in the area
+                world.getPlayers().forEach(p -> {
+                    if (p.squaredDistanceTo(villager) < 1024) { // 32 block radius
+                        ServerPlayNetworking.send(p, syncPacket);
+                    }
+                });
+
+                XeenaaVillagerManager.LOGGER.info("Successfully updated guard config for villager {} - Detection: {}, GuardMode: {}, ProfessionLocked: {}, FollowTarget: {}",
+                    packet.villagerId(),
+                    packet.config().detectionRange(),
+                    packet.config().guardMode().getDisplayName(),
+                    packet.config().professionLocked(),
+                    packet.config().followTargetPlayerId());
+
+            } catch (Exception e) {
+                XeenaaVillagerManager.LOGGER.error("Error processing guard config packet", e);
+            }
+        });
     }
 
 }

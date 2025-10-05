@@ -1,0 +1,478 @@
+
+> Configure project :
+Fabric Loom: 1.10.5
+
+> Task :compileJava
+> Task :processResources UP-TO-DATE
+> Task :classes
+> Task :compileClientJava
+> Task :processClientResources UP-TO-DATE
+> Task :jar
+> Task :clientClasses
+> Task :compileTestJava UP-TO-DATE
+> Task :processIncludeJars UP-TO-DATE
+> Task :sourcesJar
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+
+> Task :test
+
+Guard AI Goal Priority Tests > Guards find targets within 16 block range PASSED
+
+Guard AI Goal Priority Tests > Tier 4 melee guards get netherite swords PASSED
+
+Guard AI Goal Priority Tests > Guards continuously remove dynamically-added flee goals PASSED
+
+Guard AI Goal Priority Tests > Guards do not have both melee and ranged goals simultaneously PASSED
+
+Guard AI Goal Priority Tests > GuardDirectAttackGoal searches for targets every 10 ticks PASSED
+
+Guard AI Goal Priority Tests > Priority order is correct: 0 < 1 < 2 < 3 < 5 < 7 PASSED
+
+Guard AI Goal Priority Tests > Tier 2-3 melee guards get diamond swords PASSED
+
+Guard AI Goal Priority Tests > Melee guards have GuardMeleeAttackGoal PASSED
+
+Guard AI Goal Priority Tests > Guards cannot attack while on cooldown PASSED
+
+Guard AI Goal Priority Tests > Melee guards equip swords PASSED
+
+Guard AI Goal Priority Tests > Tier 0-1 melee guards get iron swords PASSED
+
+Guard AI Goal Priority Tests > Goal initialization only happens on server side PASSED
+
+Guard AI Goal Priority Tests > Guards re-equip weapons if lost (every 100 ticks) PASSED
+
+Guard AI Goal Priority Tests > Combat goals (melee/ranged) have priority 3 PASSED
+
+Guard AI Goal Priority Tests > GuardFollowVillagerGoal has priority 5 PASSED
+
+Guard AI Goal Priority Tests > GuardRetreatGoal has priority 2 PASSED
+
+Guard AI Goal Priority Tests > Guards remove flee goals during initialization PASSED
+
+Guard AI Goal Priority Tests > Guards do not drop equipped weapons (0% drop chance) PASSED
+
+Guard AI Goal Priority Tests > GuardPatrolGoal has lowest priority (7) PASSED
+
+Guard AI Goal Priority Tests > Ranged guards have GuardRangedAttackGoal PASSED
+
+Guard AI Goal Priority Tests > Passive effects only run on server side PASSED
+
+Guard AI Goal Priority Tests > GuardRetreatGoal controls MOVE and TARGET PASSED
+
+Guard AI Goal Priority Tests > Goals are initialized on world load if not already initialized PASSED
+
+Guard AI Goal Priority Tests > Cooldowns decrement each tick PASSED
+
+Guard AI Goal Priority Tests > Ranged guards equip bows and arrows PASSED
+
+Guard AI Goal Priority Tests > Combat goals are reinitialized when specialization changes PASSED
+
+Guard AI Goal Priority Tests > Path determines which combat goal is added PASSED
+
+Guard AI Goal Priority Tests > Special abilities are cleaned up when profession changes PASSED
+
+Guard AI Goal Priority Tests > Guard passive effects are handled every tick PASSED
+
+Guard AI Goal Priority Tests > Attack cooldowns prevent spam attacks PASSED
+
+Guard AI Goal Priority Tests > Guards can attack when cooldown reaches 0 PASSED
+
+Guard AI Goal Priority Tests > Special abilities tick every tick PASSED
+
+Guard AI Goal Priority Tests > GuardDefendVillageGoal has priority 1 PASSED
+
+Guard AI Goal Priority Tests > GuardDirectAttackGoal has highest priority (0) PASSED
+
+Guard AI Goal Priority Tests > GuardDirectAttackGoal runs every tick PASSED
+
+Guard AI Goal Priority Tests > Brain panic activities are cleared for guards PASSED
+
+Guard AI Goal Priority Tests > Guard weapons are unbreakable PASSED
+
+Guard AI Goal Priority Tests > Guards auto-equip weapons based on specialization PASSED
+
+Guard AI Goal Priority Tests > GuardDirectAttackGoal controls MOVE and LOOK PASSED
+
+Guard AI Goal Priority Tests > GuardSpecialAbilities are initialized with guard goals PASSED
+
+Guard AI Goal Priority Tests > All ranged guards get bows regardless of tier PASSED
+
+Guard Combat Mechanics Tests > Regeneration starts after 5 seconds out of combat PASSED
+
+Guard Combat Mechanics Tests > Ranged guards do not have area damage PASSED
+
+Guard Combat Mechanics Tests > Tier 4 melee has enhanced knockback (1.5) PASSED
+
+Guard Combat Mechanics Tests > Tier 3 melee does not have area damage PASSED
+
+Guard Combat Mechanics Tests > Guards retreat at 20% health threshold PASSED
+
+Guard Combat Mechanics Tests > Melee cooldown is shorter than ranged cooldown PASSED
+
+Guard Combat Mechanics Tests > Tier 3 melee has moderate knockback (1.0) PASSED
+
+Guard Combat Mechanics Tests > Area damage radius is 1.5 blocks PASSED
+
+Guard Combat Mechanics Tests > Melee guards have higher armor than ranged PASSED
+
+Guard Combat Mechanics Tests > Guards stop retreating at 50% health PASSED
+
+Guard Combat Mechanics Tests > Slowness II effect lasts 2 seconds (40 ticks) PASSED
+
+Guard Combat Mechanics Tests > Guard with 5/25 HP should retreat PASSED
+
+Guard Combat Mechanics Tests > Area damage is 30% of base damage PASSED
+
+Guard Combat Mechanics Tests > Tier 3 regenerates 0.5 HP per second PASSED
+
+Guard Combat Mechanics Tests > Ranged guards retreat if enemy closer than 5 blocks PASSED
+
+Guard Combat Mechanics Tests > Ranged guards maintain preferred distance 8-15 blocks PASSED
+
+Guard Combat Mechanics Tests > Melee attack cooldown is 20 ticks (1 second) PASSED
+
+Guard Combat Mechanics Tests > Ranged accuracy improves with tier PASSED
+
+Guard Combat Mechanics Tests > Recruit damage with iron sword PASSED
+
+Guard Combat Mechanics Tests > Tier 4 melee damage with netherite sword PASSED
+
+Guard Combat Mechanics Tests > Tier 4 guards have permanent Resistance I PASSED
+
+Guard Combat Mechanics Tests > Knight has 30% chance to apply Slowness II on hit PASSED
+
+Guard Combat Mechanics Tests > Lower tier melee has basic knockback (0.5-0.7) PASSED
+
+Guard Combat Mechanics Tests > Tier 4 regenerates 1.0 HP per second PASSED
+
+Guard Combat Mechanics Tests > Melee guards have higher knockback resistance than ranged PASSED
+
+Guard Combat Mechanics Tests > Tier 4 melee has area damage enabled PASSED
+
+Guard Combat Mechanics Tests > Ranged arrows apply Slowness I for 3 seconds PASSED
+
+Guard Combat Mechanics Tests > Tier 3+ guards regenerate health out of combat PASSED
+
+Guard Combat Mechanics Tests > Guard with 15/25 HP should not retreat PASSED
+
+Guard Combat Mechanics Tests > Ranged attack cooldown is 30 ticks (1.5 seconds) PASSED
+
+Guard Combat Mechanics Tests > Guard with 13/26 HP (50%) should stop retreating PASSED
+
+Guard Combat Mechanics Tests > Total damage equals base damage plus weapon damage PASSED
+
+Guard Path Specialization Tests > Melee ranks have 'melee' path ID PASSED
+
+Guard Path Specialization Tests > Tier 1 costs 15 emeralds PASSED
+
+Guard Path Specialization Tests > Tier 2 costs 20 emeralds PASSED
+
+Guard Path Specialization Tests > Tier 3 costs 45 emeralds PASSED
+
+Guard Path Specialization Tests > Tier 4 costs 75 emeralds PASSED
+
+Guard Path Specialization Tests > Ranged path has correct description PASSED
+
+Guard Path Specialization Tests > Melee path progresses: MAN_AT_ARMS_I -> II -> III -> KNIGHT PASSED
+
+Guard Path Specialization Tests > Max tier ranks have no next rank PASSED
+
+Guard Path Specialization Tests > Can purchase next rank if on previous rank PASSED
+
+Guard Path Specialization Tests > Melee path has display name 'Man-at-Arms' PASSED
+
+Guard Path Specialization Tests > Recruit path has display name 'Recruit' PASSED
+
+Guard Path Specialization Tests > Tier 1 ranks can be purchased from Recruit PASSED
+
+Guard Path Specialization Tests > Recruit has no automatic progression (player must choose) PASSED
+
+Guard Path Specialization Tests > All melee ranks belong to MELEE path PASSED
+
+Guard Path Specialization Tests > Ranged ranks have 'ranged' path ID PASSED
+
+Guard Path Specialization Tests > Cannot go back to recruit path PASSED
+
+Guard Path Specialization Tests > Ranks can trace back to previous rank PASSED
+
+Guard Path Specialization Tests > All ranged ranks belong to RANGED path PASSED
+
+Guard Path Specialization Tests > Tier 1 ranks have Recruit as previous rank PASSED
+
+Guard Path Specialization Tests > Melee path has correct description PASSED
+
+Guard Path Specialization Tests > Recruit path has correct description PASSED
+
+Guard Path Specialization Tests > Recruit is free (0 emeralds) PASSED
+
+Guard Path Specialization Tests > Path restriction enforced by available upgrades PASSED
+
+Guard Path Specialization Tests > Cannot switch from ranged to melee path PASSED
+
+Guard Path Specialization Tests > Can stay in same path for progression PASSED
+
+Guard Path Specialization Tests > Recruit has no previous rank PASSED
+
+Guard Path Specialization Tests > Costs increase with tier progression PASSED
+
+Guard Path Specialization Tests > Cannot skip ranks in progression PASSED
+
+Guard Path Specialization Tests > Ranged path progresses: MARKSMAN_I -> II -> III -> SHARPSHOOTER PASSED
+
+Guard Path Specialization Tests > Once path chosen, progression stays in that path PASSED
+
+Guard Path Specialization Tests > Cannot switch from melee to ranged path PASSED
+
+Guard Path Specialization Tests > Recruit can choose melee or ranged path PASSED
+
+Guard Path Specialization Tests > Ranged path has display name 'Marksman' PASSED
+
+Guard Rank Stats Tests > All ranged ranks return RANGED path PASSED
+
+Guard Rank Stats Tests > Melee path ID is 'melee' not 'man_at_arms' PASSED
+
+Guard Rank Stats Tests > Tier 1 ranks have correct HP value (14.0) PASSED
+
+Guard Rank Stats Tests > Tier 2 ranks have correct HP value (18.0) PASSED
+
+Guard Rank Stats Tests > Tier 3 ranks have correct HP value (22.0) PASSED
+
+Guard Rank Stats Tests > Tier 4 ranks have correct HP value (26.0) PASSED
+
+Guard Rank Stats Tests > Tier 4 ranged has correct base damage (4.5) PASSED
+
+Guard Rank Stats Tests > Melee path has movement speed scaling from low to high PASSED
+
+Guard Rank Stats Tests > Ranged ranks are correctly marked as ranged PASSED
+
+Guard Rank Stats Tests > Tier 3 ranged has correct base damage (3.5) PASSED
+
+Guard Rank Stats Tests > Tier 3 melee has correct base damage (3.0) PASSED
+
+Guard Rank Stats Tests > Tier 4 melee has correct base damage (4.0) PASSED
+
+Guard Rank Stats Tests > Ranged guards are faster than melee guards at same tier PASSED
+
+Guard Rank Stats Tests > All melee ranks return MELEE path PASSED
+
+Guard Rank Stats Tests > Tier 1 ranks have correct base damage (1.5) PASSED
+
+Guard Rank Stats Tests > Recruit has correct base damage (0.5) PASSED
+
+Guard Rank Stats Tests > Ranged path ID is 'ranged' not 'marksman' PASSED
+
+Guard Rank Stats Tests > Recruit returns RECRUIT path PASSED
+
+Guard Rank Stats Tests > Ranged path has movement speed scaling from low to high PASSED
+
+Guard Rank Stats Tests > Tier 2 ranks have correct base damage (2.5) PASSED
+
+Guard Rank Stats Tests > Melee ranks are not marked as ranged PASSED
+
+Guard Rank Stats Tests > Recruit is not marked as ranged PASSED
+
+Guard Rank Stats Tests > Recruit (Tier 0) has correct HP value (10.0) PASSED
+
+Guard Rank Stats Tests > All ranks return correct tier levels PASSED
+
+Guard Rank Stats Tests > Movement speed scales with rank progression PASSED
+
+Guard Special Abilities (Tier 4) Tests > Animation and Visual Feedback > Ranged attacks trigger bow draw animation PASSED
+
+Guard Special Abilities (Tier 4) Tests > Animation and Visual Feedback > Double Shot plays special sound at higher pitch PASSED
+
+Guard Special Abilities (Tier 4) Tests > Animation and Visual Feedback > Animation packets are sent to nearby players PASSED
+
+Guard Special Abilities (Tier 4) Tests > Animation and Visual Feedback > Sound effects play for ranged attacks PASSED
+
+Guard Special Abilities (Tier 4) Tests > Animation and Visual Feedback > Sound effects play for melee attacks PASSED
+
+Guard Special Abilities (Tier 4) Tests > Animation and Visual Feedback > Melee attacks trigger hand swing animation PASSED
+
+Guard Special Abilities (Tier 4) Tests > Damage Calculation and Scaling > Base damage starts at 1.0 for villagers PASSED
+
+Guard Special Abilities (Tier 4) Tests > Damage Calculation and Scaling > Area damage is calculated from final damage value PASSED
+
+Guard Special Abilities (Tier 4) Tests > Damage Calculation and Scaling > Weapon damage is added to base damage PASSED
+
+Guard Special Abilities (Tier 4) Tests > Damage Calculation and Scaling > Ranged damage scales with difficulty PASSED
+
+Guard Special Abilities (Tier 4) Tests > Logging and Debugging > Knight abilities log when triggered PASSED
+
+Guard Special Abilities (Tier 4) Tests > Logging and Debugging > Ranged attacks log guard rank and tier PASSED
+
+Guard Special Abilities (Tier 4) Tests > Logging and Debugging > Melee attacks log full combat details PASSED
+
+Guard Special Abilities (Tier 4) Tests > Logging and Debugging > Double Shot logs attempt and result PASSED
+
+Guard Special Abilities (Tier 4) Tests > Implementation Location and Architecture > Area damage uses helper method damageNearbyEnemies() PASSED
+
+Guard Special Abilities (Tier 4) Tests > Implementation Location and Architecture > Critical bug fix: abilities moved from unused goals to active goal PASSED
+
+Guard Special Abilities (Tier 4) Tests > Implementation Location and Architecture > All abilities are in GuardDirectAttackGoal class PASSED
+
+Guard Special Abilities (Tier 4) Tests > Implementation Location and Architecture > GuardMeleeAttackGoal and GuardRangedAttackGoal are removed from VillagerAIMixin PASSED
+
+Guard Special Abilities (Tier 4) Tests > Implementation Location and Architecture > Double Shot uses helper method fireSecondArrow() PASSED
+
+Guard Special Abilities (Tier 4) Tests > Status Effect Application > Sharpshooter Slowness is applied to arrow, not target directly PASSED
+
+Guard Special Abilities (Tier 4) Tests > Status Effect Application > Slowness effects use correct StatusEffectInstance parameters PASSED
+
+Guard Special Abilities (Tier 4) Tests > Status Effect Application > Knight Slowness is applied directly to target PASSED
+
+Guard Special Abilities (Tier 4) Tests > Status Effect Application > Knight applies Slowness II, Sharpshooter applies Slowness I PASSED
+
+Guard Special Abilities (Tier 4) Tests > Status Effect Application > Knight Slowness lasts 2 seconds, Sharpshooter Slowness lasts 3 seconds PASSED
+
+Guard Special Abilities (Tier 4) Tests > Probability and Randomness > Probability checks use guard's random number generator PASSED
+
+Guard Special Abilities (Tier 4) Tests > Probability and Randomness > Knight Slowness and Sharpshooter Double Shot have different probabilities PASSED
+
+Guard Special Abilities (Tier 4) Tests > Probability and Randomness > 100% probability abilities always trigger PASSED
+
+Guard Special Abilities (Tier 4) Tests > Probability and Randomness > Probabilities are checked each attack independently PASSED
+
+Guard Special Abilities (Tier 4) Tests > Combat Integration and Timing > Abilities only execute on successful attack PASSED
+
+Guard Special Abilities (Tier 4) Tests > Combat Integration and Timing > GuardDirectAttackGoal has priority 0 (highest) PASSED
+
+Guard Special Abilities (Tier 4) Tests > Combat Integration and Timing > Sharpshooter abilities trigger during performRangedAttack() PASSED
+
+Guard Special Abilities (Tier 4) Tests > Combat Integration and Timing > Knight abilities trigger during performMeleeAttack() PASSED
+
+Guard Special Abilities (Tier 4) Tests > Combat Integration and Timing > Melee attack cooldown is 20 ticks (1 second) PASSED
+
+Guard Special Abilities (Tier 4) Tests > Combat Integration and Timing > Ranged attack cooldown is 30 ticks (1.5 seconds) PASSED
+
+Guard Special Abilities (Tier 4) Tests > Tier Gating and Progression > No special abilities below Tier 4 PASSED
+
+Guard Special Abilities (Tier 4) Tests > Tier Gating and Progression > All special abilities unlock at Tier 4 PASSED
+
+Guard Special Abilities (Tier 4) Tests > Tier Gating and Progression > Tier 4 Knight has 3 special abilities PASSED
+
+Guard Special Abilities (Tier 4) Tests > Tier Gating and Progression > Tier 4 Sharpshooter has 1 special ability PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Second Arrow Properties > Second arrow applies Slowness I effect PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Second Arrow Properties > Second arrow Slowness is level I (amplifier 0) PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Second Arrow Properties > Second arrow applies lift for long-distance shots PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Second Arrow Properties > Second arrow damage scales with difficulty PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Second Arrow Properties > Second arrow plays special sound at higher pitch PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Second Arrow Properties > Second arrow trajectory accounts for target height PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Second Arrow Properties > Second arrow Slowness duration is 3 seconds (60 ticks) PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Second Arrow Properties > Second arrow velocity is 1.6 PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Second Arrow Properties > Second arrow has improved accuracy (8.0 vs 14.0) PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Second Arrow Properties > Second arrow uses arrow item (not guard's bow) PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Secondary Target Selection > Secondary target search box is 2x range in all dimensions PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Secondary Target Selection > Secondary target must be alive PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Secondary Target Selection > Secondary target must be visible to guard PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Secondary Target Selection > Secondary target excludes the guard itself PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Secondary Target Selection > Primary target must be alive for Double Shot to trigger PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Secondary Target Selection > Secondary target excludes primary target PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Secondary Target Selection > Secondary target search range is 15 blocks PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Secondary Target Selection > Secondary target selection finds closest valid target PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Secondary Target Selection > Secondary target must be targetable by guard PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Secondary Target Selection > No second arrow fired if no valid secondary target PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Double Shot Ability > Double Shot requires both Tier 4 and probability roll PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Double Shot Ability > Double Shot calls fireSecondArrow() method PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Double Shot Ability > Double Shot only triggers at Tier 4 PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Double Shot Ability > Double Shot has 20% trigger chance PASSED
+
+Guard Special Abilities (Tier 4) Tests > Sharpshooter Double Shot Ability > Double Shot is probability-based, not guaranteed PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Slowness II Ability > Slowness II only triggers at Tier 4 PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Slowness II Ability > Slowness uses StatusEffects.SLOWNESS effect PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Slowness II Ability > Slowness effect is level II (amplifier 1) PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Slowness II Ability > Slowness II duration is 2 seconds (40 ticks) PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Slowness II Ability > Slowness II has 30% trigger chance PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Slowness II Ability > Slowness is probability-based, not guaranteed PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Slowness II Ability > Slowness requires both Tier 4 and probability roll PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage only hits alive entities PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage is triggered every melee hit at Tier 4 PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage radius is 1.5 blocks PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage uses mob attack damage source PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage is 30% of base damage PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage only hits targetable enemies PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage excludes primary target PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage applies 0.5 knockback to nearby enemies PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage only triggers at Tier 4 PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage uses squared distance for range check PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage search box is 2x radius in all dimensions PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Area Damage Ability > Area damage excludes the guard itself PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Enhanced Knockback Ability > Tier 1 guards apply 0.6 knockback strength PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Enhanced Knockback Ability > Enhanced knockback is applied every melee hit PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Enhanced Knockback Ability > Tier 4 knights apply 1.0 knockback strength PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Enhanced Knockback Ability > Tier 0 guards apply 0.5 knockback strength PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Enhanced Knockback Ability > Tier 3 guards apply 1.0 knockback strength PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Enhanced Knockback Ability > Enhanced knockback only applies at Tier 4+ PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Enhanced Knockback Ability > Knockback was reduced from 1.5 to 1.0 after testing PASSED
+
+Guard Special Abilities (Tier 4) Tests > Knight Enhanced Knockback Ability > Tier 2 guards apply 0.7 knockback strength PASSED
+
+> Task :validateAccessWidener NO-SOURCE
+> Task :check
+> Task :remapJar
+> Task :remapSourcesJar
+> Task :assemble
+> Task :build
+
+[Incubating] Problems report is available at: file:///C:/Users/canya/Documents/projects/Minecraft/xeena-village-manager/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 10s
+11 actionable tasks: 7 executed, 4 up-to-date

@@ -1,5 +1,6 @@
 package com.xeenaa.villagermanager.data.rank.ability;
 
+import com.xeenaa.villagermanager.util.CombatEffects;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.sound.SoundEvents;
@@ -39,9 +40,10 @@ public class KnockbackAbility extends SpecialAbility {
         // Force velocity update
         target.velocityModified = true;
 
-        // Play sound effect
-        guard.getWorld().playSound(null, guard.getBlockPos(),
-                                  SoundEvents.ENTITY_IRON_GOLEM_ATTACK,
-                                  guard.getSoundCategory(), 0.5f, 1.0f);
+        // Visual effect: Knockback shockwave particles (12 particles in ring)
+        CombatEffects.spawnKnockbackShockwave(guard.getWorld(), target);
+
+        // Audio effect: Knockback impact sound (anvil land at low volume)
+        CombatEffects.playKnockbackSound(guard.getWorld(), target.getPos(), guard.getSoundCategory());
     }
 }

@@ -1,9 +1,16 @@
 package com.xeenaa.villagermanager.ai;
 
+import com.xeenaa.villagermanager.XeenaaVillagerManager;
+import com.xeenaa.villagermanager.ai.performance.GuardAIScheduler;
+import com.xeenaa.villagermanager.config.GuardBehaviorConfig;
+import com.xeenaa.villagermanager.data.GuardData;
+import com.xeenaa.villagermanager.data.GuardDataManager;
+import com.xeenaa.villagermanager.util.CombatEffects;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.Box;
 
 import java.util.EnumSet;
@@ -12,6 +19,9 @@ import java.util.List;
 /**
  * Simple, direct attack goal that makes guards attack nearby hostile mobs.
  * Bypasses vanilla targeting systems entirely.
+ *
+ * <p>This goal respects guard behavior configuration including detection range.
+ * Guards attack all visible hostile mobs within their detection range.</p>
  */
 public class GuardDirectAttackGoal extends Goal {
     private final VillagerEntity guard;
@@ -19,9 +29,72 @@ public class GuardDirectAttackGoal extends Goal {
     private int attackCooldown = 0;
     private int targetSearchCooldown = 0;
 
+    // Cached configuration values
+    private GuardBehaviorConfig cachedConfig;
+    private int configRefreshCounter = 0;
+    private static final int CONFIG_REFRESH_INTERVAL = 100; // Refresh every 5 seconds
+
     public GuardDirectAttackGoal(VillagerEntity guard) {
         this.guard = guard;
         this.setControls(EnumSet.of(Control.MOVE, Control.LOOK));
+        refreshConfiguration();
+    }
+
+    /**
+     * Refreshes the cached configuration from guard data.
+     * Only works on server side - goals only execute on server anyway.
+     */
+    private void refreshConfiguration() {
+        // Goals only execute on server side, but Goal objects exist on both sides
+        // Only access GuardDataManager on server to avoid crashes
+        if (guard.getWorld() != null && !guard.getWorld().isClient() && guard.getWorld() instanceof ServerWorld world) {
+            GuardDataManager manager = GuardDataManager.get(world);
+            if (manager != null) {
+                GuardData guardData = manager.getGuardData(guard.getUuid());
+                if (guardData != null) {
+                    GuardBehaviorConfig newConfig = guardData.getBehaviorConfig();
+                    // Log if configuration changed
+                    if (cachedConfig == null || !cachedConfig.equals(newConfig)) {
+                        XeenaaVillagerManager.LOGGER.info("Guard {} configuration updated - Detection: {}, GuardMode: {}",
+                            guard.getUuid(),
+                            newConfig.detectionRange(),
+                            newConfig.guardMode().getDisplayName());
+                    }
+                    cachedConfig = newConfig;
+                    return;
+                }
+            }
+        }
+        // Fallback to default configuration
+        if (cachedConfig == null || !cachedConfig.equals(GuardBehaviorConfig.DEFAULT)) {
+            XeenaaVillagerManager.LOGGER.debug("Guard {} using default configuration", guard.getUuid());
+        }
+        cachedConfig = GuardBehaviorConfig.DEFAULT;
+    }
+
+    /**
+     * Gets the current detection range from configuration.
+     */
+    private double getDetectionRange() {
+        // Periodically refresh configuration to pick up changes
+        if (++configRefreshCounter >= CONFIG_REFRESH_INTERVAL) {
+            configRefreshCounter = 0;
+            refreshConfiguration();
+        }
+
+        if (cachedConfig != null) {
+            return cachedConfig.detectionRange();
+        }
+        return 20.0; // Default fallback
+    }
+
+    /**
+     * Checks if the guard should engage a hostile.
+     * Guards always attack visible hostile entities within their detection range.
+     */
+    private boolean shouldEngageHostile(HostileEntity hostile) {
+        // Attack all visible hostile mobs within detection range
+        return guard.canSee(hostile);
     }
 
     @Override
@@ -34,12 +107,17 @@ public class GuardDirectAttackGoal extends Goal {
 
         targetSearchCooldown = 10;
 
-        // Find nearest hostile entity within 16 blocks
-        Box searchBox = guard.getBoundingBox().expand(16.0);
+        // Get detection range from configuration
+        double detectionRange = getDetectionRange();
+
+        // Find nearest hostile entity within configured range
+        Box searchBox = guard.getBoundingBox().expand(detectionRange);
+
+        // Find hostiles based on configuration
         List<HostileEntity> hostiles = guard.getWorld().getEntitiesByClass(
             HostileEntity.class,
             searchBox,
-            entity -> entity.isAlive() && guard.canSee(entity)
+            entity -> entity.isAlive() && shouldEngageHostile(entity)
         );
 
         if (!hostiles.isEmpty()) {
@@ -52,8 +130,6 @@ public class GuardDirectAttackGoal extends Goal {
                 .orElse(null);
 
             if (this.target != null) {
-                System.out.println("GUARD DIRECT ATTACK: Found target - " + this.target.getType().getName().getString() +
-                                 " at distance " + Math.sqrt(guard.squaredDistanceTo(this.target)));
                 return true;
             }
         }
@@ -64,23 +140,36 @@ public class GuardDirectAttackGoal extends Goal {
 
     @Override
     public boolean shouldContinue() {
+        double detectionRange = getDetectionRange();
+        double maxDistanceSquared = detectionRange * detectionRange;
+
         return this.target != null &&
                this.target.isAlive() &&
-               guard.squaredDistanceTo(this.target) < 256.0; // 16 blocks
+               guard.squaredDistanceTo(this.target) < maxDistanceSquared;
     }
 
     @Override
     public void start() {
-        System.out.println("GUARD DIRECT ATTACK: Starting attack on " + this.target.getType().getName().getString());
         guard.setTarget(this.target);
+
+        // Notify scheduler that guard entered combat for increased update frequency
+        if (guard.getWorld() instanceof ServerWorld serverWorld) {
+            GuardAIScheduler scheduler = GuardAIScheduler.get(serverWorld);
+            scheduler.markCombatActive(guard);
+        }
     }
 
     @Override
     public void stop() {
-        System.out.println("GUARD DIRECT ATTACK: Stopping attack");
         this.target = null;
         guard.setTarget(null);
         guard.getNavigation().stop();
+
+        // Notify scheduler that guard left combat for reduced update frequency
+        if (guard.getWorld() instanceof ServerWorld serverWorld) {
+            GuardAIScheduler scheduler = GuardAIScheduler.get(serverWorld);
+            scheduler.markCombatInactive(guard);
+        }
     }
 
     @Override
@@ -147,8 +236,6 @@ public class GuardDirectAttackGoal extends Goal {
             return;
         }
 
-        System.out.println("GUARD DIRECT ATTACK: Performing attack!");
-
         // Swing hand animation - must be synced to clients via EntityAnimationS2CPacket
         guard.swingHand(net.minecraft.util.Hand.MAIN_HAND);
 
@@ -159,6 +246,12 @@ public class GuardDirectAttackGoal extends Goal {
             ((net.minecraft.server.world.ServerWorld) guard.getWorld()).getChunkManager()
                 .sendToNearbyPlayers(guard, packet);
         }
+
+        // Visual effect: Weapon swing particles (2 particles for performance)
+        CombatEffects.spawnMeleeSwingParticles(guard.getWorld(), guard);
+
+        // Audio effect: Weapon swing sound
+        CombatEffects.playMeleeSwingSound(guard.getWorld(), guard.getPos(), guard.getSoundCategory());
 
         // Calculate damage - villagers don't have attack damage attribute by default, so start with 1.0
         float baseDamage = 1.0f;
@@ -179,8 +272,6 @@ public class GuardDirectAttackGoal extends Goal {
             baseDamage += (float) weaponDamage;
         }
 
-        System.out.println("GUARD DIRECT ATTACK: Dealing " + baseDamage + " damage");
-
         // Deal damage
         net.minecraft.entity.damage.DamageSource damageSource = guard.getDamageSources().mobAttack(guard);
         boolean damaged = target.damage(damageSource, baseDamage);
@@ -191,10 +282,11 @@ public class GuardDirectAttackGoal extends Goal {
                 guard.getX() - target.getX(),
                 guard.getZ() - target.getZ());
 
-            // Play attack sound
-            guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
-                net.minecraft.sound.SoundEvents.ENTITY_PLAYER_ATTACK_STRONG,
-                guard.getSoundCategory(), 1.0f, 1.0f);
+            // Visual effect: Hit impact particles (4 particles)
+            CombatEffects.spawnHitImpactParticles(guard.getWorld(), target, false);
+
+            // Audio effect: Hit impact sound
+            CombatEffects.playMeleeHitSound(guard.getWorld(), target.getPos(), guard.getSoundCategory(), false);
         }
     }
 
@@ -202,8 +294,6 @@ public class GuardDirectAttackGoal extends Goal {
         if (this.target == null) {
             return;
         }
-
-        System.out.println("GUARD DIRECT ATTACK: Performing ranged attack!");
 
         // Swing hand animation for bow draw
         guard.swingHand(net.minecraft.util.Hand.MAIN_HAND);
@@ -215,6 +305,9 @@ public class GuardDirectAttackGoal extends Goal {
             ((net.minecraft.server.world.ServerWorld) guard.getWorld()).getChunkManager()
                 .sendToNearbyPlayers(guard, packet);
         }
+
+        // Visual effect: Arrow trail particles (3 particles for performance)
+        CombatEffects.spawnArrowTrailParticles(guard.getWorld(), guard, target);
 
         // Create and shoot arrow
         net.minecraft.entity.projectile.PersistentProjectileEntity arrow =
@@ -233,15 +326,13 @@ public class GuardDirectAttackGoal extends Goal {
         // Set damage
         arrow.setDamage(2.0 + (guard.getWorld().getDifficulty().getId() * 0.5));
 
-        // Play bow sound
+        // Audio effect: Bow shoot sound (vanilla sound already included)
         guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
             net.minecraft.sound.SoundEvents.ENTITY_ARROW_SHOOT,
             guard.getSoundCategory(), 1.0f, 1.0f / (guard.getRandom().nextFloat() * 0.4f + 0.8f));
 
         // Spawn arrow
         guard.getWorld().spawnEntity(arrow);
-
-        System.out.println("GUARD DIRECT ATTACK: Shot arrow at target");
     }
 
     @Override
