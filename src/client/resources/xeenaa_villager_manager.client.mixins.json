@@ -3,6 +3,7 @@
 	"package": "com.xeenaa.villagermanager.mixin.client",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
+		"ZombieVillagerRendererMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

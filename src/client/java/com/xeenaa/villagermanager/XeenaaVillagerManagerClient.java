@@ -5,6 +5,7 @@ import com.xeenaa.villagermanager.client.network.GuardDataSyncHandler;
 import com.xeenaa.villagermanager.client.render.VillagerRendererFactory;
 import com.xeenaa.villagermanager.client.util.ClientInteractionHandler;
 import com.xeenaa.villagermanager.profession.ModProfessions;
+import com.xeenaa.villagermanager.registry.ProfessionManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityModelLayerRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
@@ -23,6 +24,12 @@ public class XeenaaVillagerManagerClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         CLIENT_LOGGER.info("Initializing Xeenaa Villager Manager client");
+
+        // Initialize ProfessionManager on client side (collects all registered professions)
+        ProfessionManager professionManager = ProfessionManager.getInstance();
+        professionManager.initialize();
+        CLIENT_LOGGER.info("Client-side ProfessionManager initialized with {} professions",
+            professionManager.getStats().total());
 
         // Register custom model layer for guard villagers
         EntityModelLayerRegistry.registerModelLayer(VillagerRendererFactory.getGuardModelLayer(),

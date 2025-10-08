@@ -1,8 +1,10 @@
 package com.xeenaa.villagermanager.registry;
 
+import com.xeenaa.villagermanager.XeenaaVillagerManager;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.text.Text;
@@ -95,9 +97,16 @@ public class ProfessionData implements Comparable<ProfessionData> {
 
     /**
      * Create display icon for the profession
-     * Uses workstation item if available, otherwise falls back to defaults
+     * Uses custom icons for specific professions, workstation item if available,
+     * or falls back to default icons
      */
     private ItemStack createIcon() {
+        // Check for Guard profession and use iron sword icon
+        if (id != null && "xeenaa_villager_manager".equals(id.getNamespace())
+            && "guard".equals(id.getPath())) {
+            return new ItemStack(Items.IRON_SWORD);
+        }
+
         if (workstation != null) {
             Item workstationItem = workstation.asItem();
             if (workstationItem != null) {

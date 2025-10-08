@@ -6,3 +6,5 @@ run/
 .gradle/
 
 .DS_Store
+
+nul

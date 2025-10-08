@@ -10,6 +10,7 @@ import com.xeenaa.villagermanager.data.rank.RankStats;
 import com.xeenaa.villagermanager.profession.ModProfessions;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.ai.brain.MemoryModuleType;
 import net.minecraft.entity.attribute.EntityAttributeInstance;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -67,6 +68,17 @@ public class ServerPacketHandler {
                 if (!canPlayerChangeProfession(player, villager)) {
                     XeenaaVillagerManager.LOGGER.warn("Player {} cannot change profession of villager {}",
                         player.getName().getString(), packet.villagerEntityId());
+                    return;
+                }
+
+                // Check if profession is Guard and villager is a baby
+                if (profession == ModProfessions.GUARD && villager.isBaby()) {
+                    XeenaaVillagerManager.LOGGER.info("Cannot assign Guard profession to baby villager {}",
+                        villager.getId());
+                    player.sendMessage(
+                        net.minecraft.text.Text.literal("Baby villagers cannot become guards. Wait for the villager to grow up."),
+                        false
+                    );
                     return;
                 }
 
@@ -157,6 +169,12 @@ public class ServerPacketHandler {
 
         // If the villager is now a guard, create guard data and sync to clients
         if (profession == ModProfessions.GUARD) {
+            // Clear HOME memory to release any claimed bed
+            // Guards don't sleep, so they shouldn't keep beds claimed
+            villager.getBrain().forget(MemoryModuleType.HOME);
+            XeenaaVillagerManager.LOGGER.debug("Cleared HOME memory for new guard {} - bed released",
+                villager.getUuid());
+
             createAndSyncGuardData(villager);
         }
     }
@@ -171,6 +189,9 @@ public class ServerPacketHandler {
         // Create new guard data
         GuardData guardData = new GuardData(villager.getUuid());
         guardManager.updateGuardData(villager, guardData);
+
+        // Set initial display name (Recruit rank)
+        guardData.updateDisplayName(villager);
 
         // Save to villager NBT
         guardData.saveToVillager(villager, world.getRegistryManager());
@@ -275,6 +296,9 @@ public class ServerPacketHandler {
 
                 // Purchase the rank
                 if (rankData.purchaseRank(targetRank, playerEmeralds)) {
+                    // Update display name to show new rank
+                    guardData.updateDisplayName(villager);
+
                     // Save guard data
                     guardData.saveToVillager(villager, world.getRegistryManager());
 

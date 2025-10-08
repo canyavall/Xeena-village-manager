@@ -3,6 +3,7 @@ package com.xeenaa.villagermanager.client.util;
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
 import com.xeenaa.villagermanager.client.data.ClientGuardDataCache;
 import com.xeenaa.villagermanager.client.gui.GuardRankScreen;
+import com.xeenaa.villagermanager.client.gui.UnifiedGuardManagementScreen;
 import com.xeenaa.villagermanager.client.gui.VillagerManagementScreen;
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.profession.ModProfessions;
@@ -53,17 +54,17 @@ public class ClientInteractionHandler {
             return ActionResult.PASS;
         }
 
-        // Check if villager is a guard and open appropriate screen
+        // Open the new unified management screen for all villagers
         MinecraftClient client = MinecraftClient.getInstance();
 
-        // Always open VillagerManagementScreen with integrated tabs for all villagers
-        VillagerManagementScreen screen = new VillagerManagementScreen(villager);
+        // Open UnifiedGuardManagementScreen for all villagers (works for guards and non-guards)
+        UnifiedGuardManagementScreen screen = new UnifiedGuardManagementScreen(villager);
         client.setScreen(screen);
 
         if (isGuard(villager)) {
-            XeenaaVillagerManager.LOGGER.info("Opened VillagerManagementScreen for guard villager with integrated tabs (shift + right-click)");
+            XeenaaVillagerManager.LOGGER.info("Opened UnifiedGuardManagementScreen for guard villager (shift + right-click)");
         } else {
-            XeenaaVillagerManager.LOGGER.info("Opened VillagerManagementScreen for villager (shift + right-click)");
+            XeenaaVillagerManager.LOGGER.info("Opened UnifiedGuardManagementScreen for villager (shift + right-click)");
         }
 
         // Consume the interaction to prevent vanilla trading GUI

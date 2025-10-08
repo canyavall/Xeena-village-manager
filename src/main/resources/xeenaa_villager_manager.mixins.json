@@ -5,7 +5,10 @@
 	"mixins": [
 		"VillagerEntityMixin",
 		"VillagerAIMixin",
-		"LivingEntityDamageMixin"
+		"LivingEntityDamageMixin",
+		"VillagerBreedingMixin",
+		"VillagerSleepMixin",
+		"VillagerZombificationMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

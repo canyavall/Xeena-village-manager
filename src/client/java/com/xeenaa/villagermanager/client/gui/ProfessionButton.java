@@ -14,17 +14,28 @@ import net.minecraft.text.Text;
 public class ProfessionButton extends ButtonWidget {
     private final ProfessionData professionData;
     private final ItemStack icon;
+    private final boolean isSelected;
 
     public ProfessionButton(int x, int y, int width, int height, ProfessionData professionData, PressAction onPress) {
+        this(x, y, width, height, professionData, onPress, false);
+    }
+
+    public ProfessionButton(int x, int y, int width, int height, ProfessionData professionData, PressAction onPress, boolean isSelected) {
         super(x, y, width, height, Text.empty(), onPress, DEFAULT_NARRATION_SUPPLIER); // Use empty text to avoid duplicate
         this.professionData = professionData;
         this.icon = professionData.getIcon();
+        this.isSelected = isSelected;
     }
 
     @Override
     public void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
         // Render the button background first
         super.renderWidget(context, mouseX, mouseY, delta);
+
+        // If selected, draw yellow border
+        if (isSelected) {
+            context.drawBorder(this.getX(), this.getY(), this.getWidth(), this.getHeight(), 0xFFFFFF00); // Yellow border
+        }
 
         // Draw the icon on the left side of the button
         if (!icon.isEmpty()) {

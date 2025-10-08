@@ -210,6 +210,14 @@ public class GuardDirectAttackGoal extends Goal {
                 guard.getNavigation().stop();
             }
 
+            // Draw bow when aiming (within shooting range)
+            if (actualDistance >= 4.0 && actualDistance <= 16.0) {
+                if (!guard.isUsingItem() && attackCooldown > 20) {
+                    // Start drawing bow (show draw animation while in cooldown)
+                    guard.setCurrentHand(net.minecraft.util.Hand.MAIN_HAND);
+                }
+            }
+
             // Shoot if in range and cooldown ready
             if (actualDistance >= 4.0 && actualDistance <= 16.0 && attackCooldown <= 0) {
                 performRangedAttack();
@@ -295,29 +303,37 @@ public class GuardDirectAttackGoal extends Goal {
             return;
         }
 
-        // Swing hand animation for bow draw
-        guard.swingHand(net.minecraft.util.Hand.MAIN_HAND);
-
-        // Send animation packet to all tracking clients
-        if (!guard.getWorld().isClient()) {
-            var packet = new net.minecraft.network.packet.s2c.play.EntityAnimationS2CPacket(guard,
-                net.minecraft.network.packet.s2c.play.EntityAnimationS2CPacket.SWING_MAIN_HAND);
-            ((net.minecraft.server.world.ServerWorld) guard.getWorld()).getChunkManager()
-                .sendToNearbyPlayers(guard, packet);
-        }
+        // Set guard to "using item" state for bow draw animation
+        guard.setCurrentHand(net.minecraft.util.Hand.MAIN_HAND);
 
         // Visual effect: Arrow trail particles (3 particles for performance)
         CombatEffects.spawnArrowTrailParticles(guard.getWorld(), guard, target);
 
-        // Create and shoot arrow
-        net.minecraft.entity.projectile.PersistentProjectileEntity arrow =
-            new net.minecraft.entity.projectile.ArrowEntity(guard.getWorld(), guard,
-                guard.getEquippedStack(net.minecraft.entity.EquipmentSlot.MAINHAND), null);
+        // Calculate arrow spawn position (from guard's eye level, offset for hand position)
+        // Villagers are 1.95 blocks tall, eye height is at ~1.62 blocks
+        double arrowX = guard.getX();
+        double arrowY = guard.getEyeY() - 0.1; // Slightly below eye level (bow hand height)
+        double arrowZ = guard.getZ();
 
-        // Calculate trajectory
-        double dx = target.getX() - guard.getX();
-        double dy = target.getBodyY(0.3333333333333333) - arrow.getY();
-        double dz = target.getZ() - guard.getZ();
+        // Offset arrow spawn to the side (right hand) based on guard's yaw
+        float yaw = guard.getYaw() * ((float)Math.PI / 180f);
+        double offsetX = -Math.sin(yaw) * 0.3; // 0.3 blocks to the right
+        double offsetZ = Math.cos(yaw) * 0.3;
+
+        arrowX += offsetX;
+        arrowZ += offsetZ;
+
+        // Create arrow at proper position
+        net.minecraft.entity.projectile.ArrowEntity arrow =
+            new net.minecraft.entity.projectile.ArrowEntity(guard.getWorld(), arrowX, arrowY, arrowZ,
+                guard.getEquippedStack(net.minecraft.entity.EquipmentSlot.MAINHAND).copy(), null);
+
+        arrow.setOwner(guard);
+
+        // Calculate trajectory from arrow's spawn position to target
+        double dx = target.getX() - arrowX;
+        double dy = target.getBodyY(0.3333333333333333) - arrowY;
+        double dz = target.getZ() - arrowZ;
         double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
 
         // Set velocity (similar to skeleton shooting)
@@ -326,13 +342,17 @@ public class GuardDirectAttackGoal extends Goal {
         // Set damage
         arrow.setDamage(2.0 + (guard.getWorld().getDifficulty().getId() * 0.5));
 
-        // Audio effect: Bow shoot sound (vanilla sound already included)
+        // Audio effect: Bow shoot sound
         guard.getWorld().playSound(null, guard.getX(), guard.getY(), guard.getZ(),
             net.minecraft.sound.SoundEvents.ENTITY_ARROW_SHOOT,
             guard.getSoundCategory(), 1.0f, 1.0f / (guard.getRandom().nextFloat() * 0.4f + 0.8f));
 
         // Spawn arrow
         guard.getWorld().spawnEntity(arrow);
+
+        // Clear "using item" state after a short delay (bow release animation)
+        // This happens automatically when the item use finishes, but we clear it manually
+        guard.clearActiveItem();
     }
 
     @Override

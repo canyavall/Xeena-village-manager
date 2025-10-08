@@ -244,4 +244,81 @@ public class GuardData {
         this.behaviorConfig = config;
         XeenaaVillagerManager.LOGGER.debug("Updated behavior config for guard {}", villagerId);
     }
+
+    /**
+     * Updates the guard villager's display name to show rank and tier.
+     * Format: "Rank Name ⭐⭐⭐⭐" with color-coded ranks based on tier.
+     *
+     * @param villager the villager entity to update
+     */
+    public void updateDisplayName(VillagerEntity villager) {
+        com.xeenaa.villagermanager.data.rank.GuardRank rank = rankData.getCurrentRank();
+        net.minecraft.text.Text displayName = createRankDisplayName(rank);
+        villager.setCustomName(displayName);
+        villager.setCustomNameVisible(true);
+
+        XeenaaVillagerManager.LOGGER.debug("Updated display name for guard {} to: {}",
+            villagerId, displayName.getString());
+    }
+
+    /**
+     * Creates a formatted display name for the guard's rank with tier stars and color coding.
+     *
+     * @param rank the guard's current rank
+     * @return formatted Text component with rank name, stars, and color
+     */
+    private net.minecraft.text.Text createRankDisplayName(com.xeenaa.villagermanager.data.rank.GuardRank rank) {
+        // Get rank name
+        String rankName = rank.getDisplayName();
+
+        // Get tier (0-4)
+        int tier = rank.getTier();
+
+        // Create display format: "Rank Name ⭐⭐⭐⭐"
+        String displayText;
+        if (tier > 0) {
+            String stars = "⭐".repeat(tier);
+            displayText = rankName + " " + stars;
+        } else {
+            // Tier 0 (Recruit) - no stars
+            displayText = rankName;
+        }
+
+        // Get color based on tier and path
+        int color = getRankColor(rank);
+
+        // Build formatted text with color
+        return net.minecraft.text.Text.literal(displayText)
+            .styled(style -> style.withColor(net.minecraft.text.TextColor.fromRgb(color)));
+    }
+
+    /**
+     * Gets the RGB color code for a rank based on its tier and specialization path.
+     *
+     * Color scheme:
+     * - Tier 0 (Recruit): White (0xFFFFFF)
+     * - Tier 1: Light Gray (0xAAAAAA)
+     * - Tier 2: Yellow (0xFFFF55)
+     * - Tier 3: Gold (0xFFAA00)
+     * - Tier 4 Melee (Knight): Aqua (0x55FFFF)
+     * - Tier 4 Ranged (Sharpshooter): Light Purple (0xFF55FF)
+     *
+     * @param rank the guard's rank
+     * @return RGB color code
+     */
+    private int getRankColor(com.xeenaa.villagermanager.data.rank.GuardRank rank) {
+        int tier = rank.getTier();
+        com.xeenaa.villagermanager.data.rank.GuardPath path = rank.getPath();
+
+        return switch (tier) {
+            case 0 -> 0xFFFFFF;  // White for Recruit
+            case 1 -> 0xAAAAAA;  // Light Gray for Tier 1
+            case 2 -> 0xFFFF55;  // Yellow for Tier 2
+            case 3 -> 0xFFAA00;  // Gold for Tier 3
+            case 4 -> path == com.xeenaa.villagermanager.data.rank.GuardPath.MELEE
+                ? 0x55FFFF   // Aqua for Knight (melee)
+                : 0xFF55FF;  // Light Purple for Sharpshooter (ranged)
+            default -> 0xFFFFFF; // Default to white
+        };
+    }
 }

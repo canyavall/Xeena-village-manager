@@ -492,7 +492,7 @@ public abstract class VillagerAIMixin extends MerchantEntity implements com.xeen
     }
 
     /**
-     * Removes brain-based flee and panic activities for guards
+     * Removes brain-based flee, panic, and sleep activities for guards
      */
     @Unique
     private void removeBrainFleeActivities() {
@@ -504,11 +504,16 @@ public abstract class VillagerAIMixin extends MerchantEntity implements com.xeen
         brain.forget(net.minecraft.entity.ai.brain.MemoryModuleType.HURT_BY);
         brain.forget(net.minecraft.entity.ai.brain.MemoryModuleType.HURT_BY_ENTITY);
 
-        System.out.println("GUARD AI: Cleared brain flee/panic memories for " + self.getUuid());
+        // Remove sleep-related memories to prevent guards from sleeping
+        brain.forget(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
+        brain.forget(net.minecraft.entity.ai.brain.MemoryModuleType.LAST_SLEPT);
+        brain.forget(net.minecraft.entity.ai.brain.MemoryModuleType.LAST_WOKEN);
+
+        System.out.println("GUARD AI: Cleared brain flee/panic/sleep memories for " + self.getUuid());
     }
 
     /**
-     * Continuously clears brain panic state for guards
+     * Continuously clears brain panic and sleep state for guards
      */
     @Unique
     private void clearBrainPanic() {
@@ -518,6 +523,11 @@ public abstract class VillagerAIMixin extends MerchantEntity implements com.xeen
         // Continuously clear panic-related memories to prevent fleeing
         if (brain.hasMemoryModule(net.minecraft.entity.ai.brain.MemoryModuleType.HIDING_PLACE)) {
             brain.forget(net.minecraft.entity.ai.brain.MemoryModuleType.HIDING_PLACE);
+        }
+
+        // Continuously clear sleep-related memories to prevent guards from trying to sleep
+        if (brain.hasMemoryModule(net.minecraft.entity.ai.brain.MemoryModuleType.HOME)) {
+            brain.forget(net.minecraft.entity.ai.brain.MemoryModuleType.HOME);
         }
     }
 
