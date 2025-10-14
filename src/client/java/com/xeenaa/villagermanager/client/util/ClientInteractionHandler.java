@@ -2,9 +2,7 @@ package com.xeenaa.villagermanager.client.util;
 
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
 import com.xeenaa.villagermanager.client.data.ClientGuardDataCache;
-import com.xeenaa.villagermanager.client.gui.GuardRankScreen;
 import com.xeenaa.villagermanager.client.gui.UnifiedGuardManagementScreen;
-import com.xeenaa.villagermanager.client.gui.VillagerManagementScreen;
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.profession.ModProfessions;
 import net.minecraft.client.MinecraftClient;

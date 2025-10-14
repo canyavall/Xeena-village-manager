@@ -2,8 +2,7 @@ package com.xeenaa.villagermanager.client.network;
 
 import com.xeenaa.villagermanager.XeenaaVillagerManager;
 import com.xeenaa.villagermanager.client.data.ClientGuardDataCache;
-import com.xeenaa.villagermanager.client.gui.GuardProfessionChangeScreen;
-import com.xeenaa.villagermanager.client.gui.TabbedManagementScreen;
+import com.xeenaa.villagermanager.client.gui.UnifiedGuardManagementScreen;
 import com.xeenaa.villagermanager.data.GuardData;
 import com.xeenaa.villagermanager.data.rank.GuardRankData;
 import com.xeenaa.villagermanager.network.GuardDataSyncPacket;
@@ -386,7 +385,7 @@ public class GuardDataSyncHandler {
 
     /**
      * Refreshes the villager management screen if it's currently open for the specified villager.
-     * This ensures rank purchases update the GUI immediately without requiring tab switching.
+     * This ensures rank purchases update the GUI immediately.
      *
      * @param client the Minecraft client instance
      * @param villagerId the UUID of the villager whose data was updated
@@ -394,15 +393,13 @@ public class GuardDataSyncHandler {
     private static void refreshManagementScreenIfOpen(MinecraftClient client, java.util.UUID villagerId) {
         try {
             Screen currentScreen = client.currentScreen;
-            if (currentScreen instanceof TabbedManagementScreen managementScreen) {
+            if (currentScreen instanceof UnifiedGuardManagementScreen managementScreen) {
                 // Check if the screen is for the same villager
-                if (managementScreen.getTargetVillager().getUuid().equals(villagerId)) {
-                    managementScreen.refreshActiveTab();
-                    LOGGER.debug("Refreshed management screen for villager {} after rank sync", villagerId);
-                }
+                // Note: UnifiedGuardManagementScreen needs a refresh method if real-time updates are needed
+                LOGGER.debug("Management screen is open for villager {}, data updated in cache", villagerId);
             }
         } catch (Exception e) {
-            LOGGER.warn("Failed to refresh management screen for villager {}: {}", villagerId, e.getMessage());
+            LOGGER.warn("Failed to check management screen for villager {}: {}", villagerId, e.getMessage());
         }
     }
 
@@ -433,25 +430,24 @@ public class GuardDataSyncHandler {
     }
 
     /**
-     * Processes the emerald loss warning packet and shows the confirmation dialog.
+     * Processes the emerald loss warning packet and shows a chat message.
+     * TODO: Implement proper confirmation dialog in UnifiedGuardManagementScreen
      */
     private static void processEmeraldLossWarning(GuardEmeraldRefundPacket packet, MinecraftClient client) {
         Objects.requireNonNull(packet, "Guard emerald loss warning packet must not be null");
         Objects.requireNonNull(client, "Minecraft client must not be null");
 
         try {
-            // Create and show the guard profession change confirmation screen
-            GuardProfessionChangeScreen confirmationScreen = new GuardProfessionChangeScreen(
-                client.currentScreen,
-                packet.villagerEntityId(),
-                packet.newProfessionId(),
-                packet.totalEmeraldsToRefund(), // This value represents emeralds to lose, not refund
-                packet.currentRankName()
-            );
+            // Show emerald loss warning in chat
+            if (client.player != null) {
+                client.player.sendMessage(
+                    net.minecraft.text.Text.literal("⚠ Warning: Changing profession will lose " + packet.totalEmeraldsToRefund() + " emeralds spent on " + packet.currentRankName())
+                        .styled(style -> style.withColor(0xFFAA00)),
+                    false
+                );
+            }
 
-            client.setScreen(confirmationScreen);
-
-            LOGGER.info("Opened guard profession change confirmation dialog: villager={}, new_profession={}, emeralds_to_lose={}",
+            LOGGER.info("Displayed emerald loss warning: villager={}, new_profession={}, emeralds_to_lose={}",
                 packet.villagerId(), packet.newProfessionId(), packet.totalEmeraldsToRefund());
 
         } catch (Exception e) {
